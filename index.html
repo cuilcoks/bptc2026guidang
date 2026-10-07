@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BTPC 赛事归档站</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:#0f1117;color:#e9e7e4;font-family:-apple-system,BlinkMacSystemFont,"Microsoft YaHei",sans-serif;line-height:1.75;min-height:100vh}
+a{color:#ffb703}
+.top{position:sticky;top:0;z-index:10;background:rgba(15,17,23,.9);border-bottom:1px solid #2a3040;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;backdrop-filter:blur(10px)}
+.brand{font-weight:800;font-size:16px}
+.brand span{color:#e8622f}
+.nav{margin-left:auto;display:flex;gap:6px}
+.nav button{background:transparent;border:1px solid transparent;color:#98a0b3;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit}
+.nav button:hover{color:#fff;background:#1d2230}
+.nav button.on{color:#fff;background:#e8622f}
+.wrap{max-width:1000px;margin:0 auto;padding:24px 20px 80px}
+.page{display:none}
+.page.on{display:block}
+.note{background:rgba(232,98,47,.1);border:1px solid rgba(232,98,47,.3);border-left:4px solid #e8622f;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13.5px;color:#f0d9c8}
+.note b{color:#ffb703}
+.search{width:100%;padding:11px 15px;border-radius:10px;background:#161a24;border:1px solid #2a3040;color:#e9e7e4;font-size:14px;font-family:inherit;outline:none;margin-bottom:20px}
+.search:focus{border-color:#e8622f}
+.sec{display:flex;align-items:center;gap:12px;margin:30px 0 16px;padding-bottom:10px;border-bottom:2px solid #2a3040}
+.sec .idx{font-size:12px;font-weight:800;letter-spacing:1px;color:#e8622f;background:rgba(232,98,47,.12);border:1px solid rgba(232,98,47,.3);padding:3px 10px;border-radius:6px}
+.sec h2{margin:0;font-size:19px}
+.sec .cnt{margin-left:auto;color:#98a0b3;font-size:13px}
+.puz{background:#161a24;border:1px solid #2a3040;border-radius:12px;margin-bottom:12px;overflow:hidden}
+.puz:hover{border-color:#39415a}
+.puz.open{border-color:rgba(232,98,47,.55)}
+.puz.done{border-color:rgba(52,199,89,.45)}
+.puz-h{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;user-select:none}
+.puz.open .puz-h{background:#1d2230}
+.puz-idx{min-width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:#232838;border:1px solid #2a3040;font-weight:800;font-size:13px;color:#ffb703}
+.puz.open .puz-idx{background:#e8622f;color:#fff;border-color:transparent}
+.puz-t{flex:1;min-width:0}
+.puz-title{margin:0;font-size:16px;font-weight:700}
+.puz-tags{margin-top:4px;display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:11px;padding:2px 9px;border-radius:99px;background:#232838;border:1px solid #2a3040;color:#98a0b3}
+.tag.n{color:#7fd1ff;border-color:rgba(127,209,255,.3);background:rgba(127,209,255,.08)}
+.tag.m{color:#c9a6ff;border-color:rgba(201,166,255,.3);background:rgba(201,166,255,.08)}
+.tag.f{color:#ffb703;border-color:rgba(255,183,3,.35);background:rgba(255,183,3,.1)}
+.tag.ok{color:#34c759;border-color:rgba(52,199,89,.35);background:rgba(52,199,89,.1);font-weight:700}
+.arrow{color:#98a0b3;font-size:12px;transition:.2s}
+.puz.open .arrow{transform:rotate(180deg);color:#e8622f}
+.puz-b{display:none;border-top:1px solid #2a3040;padding:20px;background:#1d2230}
+.puz.open .puz-b{display:block}
+.body{font-size:14px;color:#d6d3cf;overflow-wrap:break-word}
+.body img{max-width:100%;border-radius:8px;display:block;margin:12px 0}
+.body p{margin:8px 0}
+.miss{background:#1a1f2c;border:1px dashed #3a4256;border-radius:8px;padding:12px 14px;margin:10px 0;font-size:12.5px;color:#98a0b3}
+.miss code{background:#0e1119;padding:1px 6px;border-radius:4px;color:#8fa3c7;font-size:11px}
+.h-title{margin:22px 0 10px;font-size:12px;font-weight:800;letter-spacing:1.5px;color:#ffb703;text-transform:uppercase}
+.hint{background:#161a24;border:1px solid #2a3040;border-left:3px solid #ffb703;border-radius:8px;margin-bottom:8px;overflow:hidden}
+.hint-h{display:flex;align-items:center;gap:9px;padding:11px 14px;cursor:pointer;font-size:13px;color:#ffd97a;font-weight:700;user-select:none}
+.hint-h:hover{background:#1d2230}
+.hint-h .ico{font-size:13px}
+.hint-h .ar{margin-left:auto;color:#98a0b3;font-size:11px;transition:.2s}
+.hint.un .hint-h .ar{transform:rotate(180deg)}
+.hint-b{display:none;padding:0 14px 12px;font-size:13px;color:#c8c5c0;overflow-wrap:break-word}
+.hint.un .hint-b{display:block}
+.hint-b img{max-width:100%;border-radius:6px;margin-top:6px}
+.nohint{color:#98a0b3;font-size:13px;font-style:italic;padding:10px 14px;border:1px dashed #2a3040;border-radius:8px}
+.ans{margin-top:20px;padding-top:16px;border-top:1px dashed #2a3040}
+.ans h4{margin:0 0 10px;font-size:12px;font-weight:800;letter-spacing:1.5px;color:#ffb703;text-transform:uppercase}
+.ans-row{display:flex;gap:8px}
+.ans-row input{flex:1;padding:10px 14px;border-radius:8px;background:#161a24;border:1px solid #2a3040;color:#e9e7e4;font-size:14px;font-family:inherit;outline:none}
+.ans-row input:focus{border-color:#e8622f}
+.ans-row input:disabled{opacity:.5}
+.ans-row button{padding:10px 20px;border-radius:8px;border:none;background:#e8622f;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
+.ans-row button:hover{background:#c94f22}
+.ans-row button:disabled{opacity:.4;cursor:not-allowed}
+.msg{margin-top:8px;font-size:13px;min-height:19px}
+.msg.ok{color:#34c759}
+.msg.bad{color:#ff6b6b}
+.msg.tip{color:#ffb703}
+.recs{margin-top:14px}
+.rec-title{font-size:11.5px;color:#98a0b3;margin-bottom:8px}
+.rec{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:7px;background:#161a24;border:1px solid #2a3040;font-size:12.5px;margin-bottom:5px}
+.rec-a{flex:1;word-break:break-all;color:#d6d3cf}
+.rec-t{font-size:11px;padding:1px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
+.rec-t.ok{color:#34c759;background:rgba(52,199,89,.12);border:1px solid rgba(52,199,89,.3)}
+.rec-t.bad{color:#ff6b6b;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.28)}
+.rec-t.ms{color:#ffb703;background:rgba(255,183,3,.1);border:1px solid rgba(255,183,3,.3)}
+.rec-tm{color:#5c6478;font-size:11px}
+.rec-clr{margin-top:6px;background:transparent;border:1px solid #2a3040;color:#98a0b3;font-size:11.5px;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:inherit}
+.rec-clr:hover{color:#ff6b6b;border-color:rgba(255,107,107,.35)}
+.prog{display:flex;align-items:center;gap:12px;background:#161a24;border:1px solid #2a3040;border-radius:10px;padding:11px 16px;margin-bottom:16px;font-size:13.5px}
+.prog b{color:#ffb703;font-size:15px}
+.prog .bar{flex:1;height:6px;border-radius:99px;background:#232838;overflow:hidden}
+.prog .fill{height:100%;background:linear-gradient(90deg,#e8622f,#ffb703);width:0;transition:width .4s}
+.prog .pct{color:#98a0b3;font-size:12px}
+.ann{background:#161a24;border:1px solid #2a3040;border-radius:12px;padding:18px 22px;margin-bottom:14px;position:relative;overflow:hidden}
+.ann::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#e8622f,#ffb703)}
+.ann-h{font-size:11.5px;color:#98a0b3;margin-bottom:8px;display:flex;gap:8px;align-items:center}
+.ann-h .bg{background:rgba(232,98,47,.15);color:#e8622f;border:1px solid rgba(232,98,47,.3);padding:1px 8px;border-radius:99px;font-size:10.5px;font-weight:700}
+.ann-b{font-size:14px;color:#d6d3cf;overflow-wrap:break-word}
+.ann-b b{color:#fff}
+.about{background:#161a24;border:1px solid #2a3040;border-radius:12px;padding:24px 26px}
+.about h3{color:#ffb703;font-size:15px;margin-top:0}
+.about ul{color:#c8c5c0;font-size:14px;padding-left:20px}
+.about li{margin:5px 0}
+.about code{background:#0e1119;padding:2px 6px;border-radius:4px;color:#8fa3c7;font-size:12px}
+footer{text-align:center;padding:30px 20px;color:#5c6478;font-size:12px;border-top:1px solid #2a3040;margin-top:30px}
+.gate{position:fixed;inset:0;z-index:100;background:rgba(8,10,15,.9);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px}
+.gate.hide{display:none}
+.gate-b{background:#161a24;border:1px solid #2a3040;border-radius:16px;padding:30px 28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.gate-b h1{margin:0 0 8px;font-size:19px}
+.gate-b .sub{color:#98a0b3;font-size:13px;margin-bottom:22px;line-height:1.7}
+.gate-b label{display:block;font-size:12px;color:#98a0b3;margin-bottom:6px;font-weight:600}
+.gate-b input{width:100%;padding:11px 14px;border-radius:9px;background:#1d2230;border:1px solid #2a3040;color:#e9e7e4;font-size:14px;font-family:inherit;outline:none;margin-bottom:14px}
+.gate-b input:focus{border-color:#e8622f}
+.gate-b .btn{width:100%;padding:12px;border-radius:10px;border:none;background:#e8622f;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:6px}
+.gate-b .btn:hover{background:#c94f22}
+.who{margin-left:auto;font-size:12.5px;color:#98a0b3;display:flex;align-items:center;gap:8px}
+.who b{color:#ffb703}
+.who button{background:none;border:none;color:#98a0b3;cursor:pointer;text-decoration:underline;font-size:12px;font-family:inherit;padding:0}
+.who button:hover{color:#fff}
+@media(max-width:640px){.wrap{padding:16px 12px 60px}.top{padding:10px 12px}.nav{width:100%;order:3}.nav button{flex:1}.ans-row{flex-direction:column}.ans-row button{width:100%}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span>◆</span> BTPC 赛事归档站</div>
+  <div class="nav">
+    <button data-p="puz" class="on">题目</button>
+    <button data-p="ann">公告</button>
+    <button data-p="about">关于</button>
+  </div>
+  <div class="who">队伍：<b id="wt">—</b> / 选手：<b id="wp">—</b> <button id="edit">修改</button></div>
+</div>
+
+<div class="wrap">
+  <section class="page on" id="page-puz">
+    <div class="note"><b>归档说明：</b>本站为静态归档站，已关闭注册与柿币系统，保留题目、公告、提示、作答与提交记录。所有数据仅保存在你自己的浏览器本地。</div>
+    <input type="text" class="search" id="search" placeholder="搜索题目名称、分区、提示关键词…">
+    <div id="list"></div>
+  </section>
+  <section class="page" id="page-ann">
+    <div class="note"><b>公告归档：</b>共 <span id="anc">0</span> 条，按发布时间排列。</div>
+    <div id="anl"></div>
+  </section>
+  <section class="page" id="page-about">
+    <div class="about">
+      <h3>关于本站</h3>
+      <p>本页面为 <b>BTPC 忙忙碌碌寻宝藏系列 · 景晨版本第三个宝藏公线赛</b> 的静态归档版本。</p>
+      <h3>已关闭</h3>
+      <ul>
+        <li>注册、登录、会话管理</li>
+        <li>柿币系统、兑换码、管理员调整</li>
+        <li>站内信、提问、排行榜、赛事计时</li>
+        <li>全部后端接口与数据库读写</li>
+      </ul>
+      <h3>保留</h3>
+      <ul>
+        <li>全部 18 道题目与提示</li>
+        <li>全部赛事公告</li>
+        <li>作答与提交记录（纯前端判题，仅存本地）</li>
+        <li>做题进度条</li>
+      </ul>
+      <h3>数据存储</h3>
+      <p>身份、提示解锁状态、提交记录均保存在浏览器本地 <code>localStorage</code>，不上传、不共享。</p>
+      <h3>分区</h3>
+      <ul>
+        <li>s1 · 在那忙忙碌碌的时代（7 题）</li>
+        <li>s2 · 名为成语的史诗（6 题）</li>
+        <li>s3 · 有对你想说的（4 题）</li>
+        <li>s4 · 谁拿走了金铲子（1 题 · 最终）</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<footer>BTPC 忙忙碌碌寻宝藏 · 景晨版本第三个宝藏公线赛 · 静态归档站</footer>
+
+<div class="gate hide" id="gate">
+  <div class="gate-b">
+    <h1>欢迎来到赛事归档站</h1>
+    <div class="sub">本站已关闭注册与登录。请填写你的队伍名与选手名，仅保存在本地，不会上传。</div>
+    <label>队伍名称</label>
+    <input type="text" id="in-team" maxlength="24" placeholder="请输入队伍名称">
+    <label>选手名称</label>
+    <input type="text" id="in-player" maxlength="24" placeholder="请输入选手名称">
+    <button class="btn" id="enter">进入归档站</button>
+  </div>
+</div>
+
+<script>
+const ARCHIVE_HAS_ASSETS = false;
+const SECTIONS = [
+  {id:'s1',name:'在那忙忙碌碌的时代',label:'S1'},
+  {id:'s2',name:'名为成语的史诗',label:'S2'},
+  {id:'s3',name:'有对你想说的',label:'S3'},
+  {id:'s4',name:'谁拿走了金铲子',label:'S4·FINAL'}
+];
+const TYPE = {normal:'普通题',meta:'Meta 题',final:'最终题'};
+const ANS = {
+  p_1789735719724:['water'],p_1789376033456:['msf'],p_1789796642628:['xl'],
+  p_1789042262708:['sunday'],p_1789829072049:['drift'],p_1789880111723:['twist'],
+  p_1789880156850:['fixate'],
+  p_1789883237148:['合抱之木，生于毫末','合抱之木生于毫末','合抱之木,生于毫末'],
+  p_1789883282265:['九层之台，起于累土','九层之台起于累土','九层之台,起于累土'],
+  p_1789883252473:['日复一日'],p_1789883295025:['上善若水'],p_1789883266217:['金戈铁马'],
+  p_1789883308641:['world'],p_1790604473893:['may this journey lead us starward'],
+  p_1789657766936:['sanzimi_auto_pass'],p_1789801092927:['negroni'],
+  p_1790218681753:['穆卓儿','穆卓尔'],p_1790604104878:['*']
+};
+const MS = {
+  p_1789735719724:['rain','drop','stream','fills','cold','clear','blue','wet','pool'],
+  p_1789376033456:['多级闪蒸蒸馏法','多级闪蒸'],p_1789042262708:['brother'],
+  p_1789883237148:['合抱之木'],p_1789883282265:['9土'],p_1789883295025:['1.1'],
+  p_1789883308641:['worldmap'],p_1789883252473:['physicist','sun circle']
+};
+const PUZ = [
+  {id:'p_1789735719724',s:'s1',t:'normal',o:1,title:'数形结合',
+    c:`<p>这个世界上有很多数字组成的puzzle，但是这个文本真的什么都没有吗，为什么不尝试一下联合呢（景晨最讨厌的dm）</p>
+<div style="display:flex;flex-direction:column;gap:10px;">
+<img src="img/sxjh/P1.png"><img src="img/sxjh/P2.png"><img src="img/sxjh/P3.png">
+<img src="img/sxjh/P4.png"><img src="img/sxjh/P5.png"><img src="img/sxjh/P6.png">
+</div>`,
+    h:[{t:'我没有头绪',c:'这里所有的图都是不算太经典的数字表格类谜题，你可以尝试分别解答'},
+       {t:'第一个图片是什么谜题',c:'数图'},{t:'第二个图片是什么谜题',c:'数回'},
+       {t:'第三个图片是什么谜题',c:'点灯'},{t:'第四个图片是什么谜题',c:'数桥'},
+       {t:'第五个图片是什么谜题',c:'摩天楼（但是你要忽略一个字母）'},{t:'第六个图片是什么谜题',c:'数独'}]},
+  {id:'p_1789376033456',s:'s1',t:'normal',o:2,title:'拼夕成多',
+    c:`<p>这本应当是应该提交上去的文章，但是不小心被墨涂上去了，只能复原出这些了</p>
+<img src="img/pxx/pxx1new.png"><img src="img/pxx/pxxhint1.png">
+<iframe src="extra/pxx.html" style="width:100%;height:600px;border:1px solid #ddd;border-radius:8px;"></iframe>`,
+    h:[{t:'哪个是原来的，哪个是新增的',c:'揭字游戏是新的，本质上这俩是一样的'},
+       {t:'这是个什么',c:'这是一篇文章，你可以在百度百科上找到'},
+       {t:'下半段可以复原一下吗',c:'<img src="img/pxx/pxxallnew.png">'},
+       {t:'某些拼字我看不懂',c:'本题就一个拼字，具体内容是向光道'}]},
+  {id:'p_1789796642628',s:'s1',t:'normal',o:3,title:'原色',
+    c:`<p>词不达意，了无新意</p><p>唯有线段，沉吟至今</p><p>为耀嘉音打call</p>
+<p><a href="https://www.kdocs.cn/l/co3NP0FbzcHy" target="_blank">原色</a></p>
+<img src="img/yuanse/P1.png"><img src="img/yuanse/P2.png">`,
+    h:[{t:'我莫有头绪',c:'你需要将原排版的歌词更新为新的排版，并查看'},
+       {t:'我发现有些字有颜色欸',c:'真棒，看看拥有颜色的字他们的规律并找到该规律下相同的字'},
+       {t:'该如何提取',c:'在提示2后，将有规律的字链接获得单词'}]},
+  {id:'p_1789042262708',s:'s1',t:'normal',o:4,title:'拉条ing',
+    c:`<p>你知道吗，星期一和星期日一样，都可以被拉条</p>
+<audio controls src="audio/latiao/latiao1.mp3"></audio>
+<audio controls src="audio/latiao/latiao2.mp3"></audio>
+<audio controls src="audio/latiao/latiao3.mp3"></audio>
+<audio controls src="audio/latiao/latiao4.mp3"></audio>
+<audio controls src="audio/latiao/latiao5.mp3"></audio>
+<audio controls src="audio/latiao/latiao6.mp3"></audio>
+<audio controls src="audio/latiao/latiao7.mp3"></audio>`,
+    h:[{t:'提示一：我毫无头绪',c:'这五首歌都是银河著名歌姬所演唱的，你需要听出五首歌，以及对应的歌词'},
+       {t:'提示二：我找到了这五首歌以及所给的歌词对应的内容我该干什么',c:'你可以看看英语名字然后进行寻找'},
+       {t:'提示三：该如何提取',c:'根据给予的歌曲片段将歌曲按照字母数量进行切割'}]},
+  {id:'p_1789829072049',s:'s1',t:'normal',o:5,title:'签到',
+    c:`<p>徐女士找到了个签到网址，听说是每次给的签是生命的真谛</p>
+<iframe src="extra/sign.html" style="width:100%;height:600px;border:1px solid #ddd;border-radius:8px;"></iframe>`,
+    h:[{t:'为什么有些时候无法签到或者签到的情况是一样的',c:'你可以从8点开始签到，每俩个小时的签一样的'},
+       {t:'为什么所有的签都不是人话（CCBC语）',c:'这些签原本应该是有规律的，但是中间因为特殊原因存在了空格'},
+       {t:'我把所有的签都得完了，然后呢',c:'你可以通过加入"滚木"来得到五个有规律的非合法单词'},
+       {t:'我找到排版了，然后呢',c:'风味文本很好的解决了这一事情（CCBC语）'},
+       {t:'为什么我的转换有问题呢',c:'为什么不试下A是00001呢'},
+       {t:'为什么存在转换有问题呢',c:'11011~11111：大于 26，无对应字母，因为伊甸园状态下超过了11111，所以你需要尝试爆破了，但是我保证，真的很少'},
+       {t:'我的转换和排版可以给点思路吗',c:'"滚木"可能指00000或11011~11111：大于 26，无对应字母，大于没法推理，但是00000可以尝试呢'}]},
+  {id:'p_1789880111723',s:'s1',t:'normal',o:6,title:'速推蚂蚁',
+    c:`<p>这个兰顿蚂蚁为什么跟我玩的不一样</p>
+<img src="img/stmy/P1.png"><img src="img/stmy/P2.png"><img src="img/stmy/P3.png">
+<img src="img/stmy/P4.png"><img src="img/stmy/P5.png">
+<p>提示用颜色（提示按照排序回答）</p><img src="img/stmy/colour.png">`,
+    h:[{t:'如何理解FT（风味文本）',c:'本题相对于原版的兰顿蚂蚁增加了更多的颜色，并且不存在黑变白之类的'},
+       {t:'在颜色上我没有思路',c:'至少这个谜题并没有更改兰顿蚂蚁的基础颜色'},
+       {t:'颜色一是什么',c:'不更改方向，向前一步'},{t:'颜色二是什么',c:'旋转180°之后走一步'},
+       {t:'颜色三是什么',c:'顺时针90°走俩步'},{t:'颜色四是什么',c:'逆时针90°走俩步'},
+       {t:'颜色五是什么',c:'向前一步后顺时针90°后在前进一步'},
+       {t:'颜色六是什么',c:'向前一步后逆时针90°后在前进一步'},
+       {t:'颜色七是什么',c:'走俩步'},{t:'该如何提取',c:'你知道每个颜色字母走后，为什么不尝试带入图像中呢'}]},
+  {id:'p_1789880156850',s:'s1',t:'meta',o:7,title:'听见你的声音',
+    c:`<p>景晨最喜欢玩的音游乌蒙上新了新的曲《神的随波逐流》</p>
+<p>有些歌为什么那么多歌名，他吐槽</p>
+<p>但是今天再次游玩的时候他发现了许多机器都音不对屏</p>
+<p>有些视频来自于网络，再次感谢这些大佬</p>
+<p>（主办方也是没辙了才出如此下册）</p>
+<p>因为视频很大，为了节省网站流量，请凭借此题截图私聊主办方获取文件</p>`,
+    h:[{t:'什么是meta',c:'Meta（元谜题）它要靠本区前面普通小题，解出来的答案当作输入素材，再解出新答案。'},
+       {t:'我没有头绪',c:'你可以先尝试游玩这些游戏呢'},
+       {t:'如何理解ft（风味文本）',c:'ft中涉及到了4个关键词，你可以将前面小题的答案与这俩个关键词联合一块'},
+       {t:'ft中的关键词是什么',c:'音游，神的随波逐流，歌名，音不对屏'},
+       {t:'如何联系起来（该如何提取）',c:'先去寻找每个音游对应的歌曲，歌曲对应的是小题答案，你再寻找对应的小题答案和音游的重复点'},
+       {t:'我就是反骨，我就要在这里看',c:'那你看吧'}]},
+  {id:'p_1789883237148',s:'s2',t:'normal',o:1,title:'第一章：致坚强的生命',
+    c:`<p>"你试过0帧起手吗？"</p><p>（作者向你真诚的发问）</p>
+<p>"？？？何意味？？？"</p><p>"那就好，现在，也请你零帧起手吧！"</p>
+<p>（话音未落，作者就突然消失）</p><p>"不是哥们，我要干啥我都不知道啊！"</p>`,
+    h:[{t:'本题的题目在哪？',c:'在本赛事的网站内的一个角落，根据风味文本你或许能够更好地定位它的位置'},
+       {t:'我找到题目文本了，我需要做什么？',c:'理解、总结、概括，找到与第一章内容相契合的成语答案'},
+       {t:'寻求作者帮助：可以降低一点我的阅读理解难度吗？',c:'作者无奈的评价道：好吧，你不妨寻找一下前后两个时间点，相同的人对相同的一个事物进行的动作，这是本题答案的一个关键字'}]},
+  {id:'p_1789883282265',s:'s2',t:'normal',o:2,title:'第二章：致高处的风光',
+    c:`<p>（作者带你来到了山上，此时正是薄暮，说真的，现在这个场景真的美极了！）</p>
+<p>"这次怎么来山上观光了？"</p><p>"你平时有在高处回望过往的习惯吗？"</p>
+<p>（作者反问，眼中只有山下的苍茫）</p><p>"并没有，怎么了嘛？"</p>
+<p>"嗯，当你走遍天下感到疲惫时，不妨在高处回望你的足迹，这不仅是你努力的证明，也是一种前进激励"</p>
+<p>"这样做真的不会感到更迷茫吗？"</p>
+<p>（你回想起自己过去在那些不断重复的障碍中徘徊不前的痛苦）</p>
+<p>"emmm，或许你需要换个方向，找到适合你的道路。明确你的起点与终点吧！自会有时间为你凝聚路径。"</p>
+<p>（作者笑了笑，接着说道）</p>
+<p>"来，这本奇怪的古籍给你，说不定能给你一点前进的建议？"</p>
+<p>（你拿过这本古籍，却发现上面的内容已经模糊不清，乱七八糟）</p>
+<p>"666，就没有完整高清版吗"</p>
+<p><b>【古籍（破损版）】</b></p>
+<p>世间有四条寻访之路，藏着四座序列，依次探寻：</p>
+<p style="word-break:break-all;line-height:2;">力≠一和自1儒√破且火学榜榜先师力诞の雪生之或地熬1启破程走≠过木以华贵¥名和熬花力闻且破≠熬名力或的平雪¥原城抵0彩达出土8且彩六力和千得年前蚌塑龙且和形2遗熬迹且5彩的地√或方转入鲁6彩8仲和连6雪射或且9书解8围破√典故9发12生的且古の城和2榜力去往自古帝和王火登临雪或封禅寓得7意和国泰和民8木得安且的城邑9终点火和是藏有地下火木√古7道力且和4以药草和闻5名的曹雪魏√故和木里榜二熬起于出≠土力青或铜4榜雪重火器铭文の记雪载中力国一词最7早文彩榜字的城9池7踏入十三3朝古熬都继而向木东去往榜秦得岭腹地出土夏木の代玉或璋彩的地4方三从供7奉¥破药熬或0和雪王2孙思邈√的木8塬上之雪城榜或出3发南下1重≠回破十得≠三榜火朝古都继续沿汉≠雪水力5破流域前且行抵√达常6年举榜0办龙彩且和火雪舟盛力会的6秦巴腹火榜地力4或之雪城四の自3留榜有2三国彩古木9破或且战场0木1且故事张熬彩良隐熬居5雪之地4和的汉家雪郡邑3熬出发3顺雪≠着6榜汉¥水破向东彩或力抵达或龙得3雪舟且民俗兴盛得之城榜最和木且≠后力到熬达供奉真得武大帝火道榜教力祖庭¥木雪彩所且在0的5榜雪城池</p>`,
+    h:[{t:'我毫无头绪',c:'按照你与作者之间的对话，你可以对这本古籍进行修复工作'},
+       {t:'我还是看不懂作者的话，可以给我翻译一下吗？',c:'寻找古籍中大量重复存在的不合理文字并删去，你就可以得到较为通顺的文段'},
+       {t:'我认为我得到了合理的文段，接下来该怎么办？',c:'分析每条路线吧，找到途经点'},
+       {t:'该如何提取',c:'请按作者所言，以高处视角观察这几条路线，你就能得到代表答案的"起点"与"终点"'}]},
+  {id:'p_1789883252473',s:'s2',t:'normal',o:3,title:'第三章：致平凡的我们',
+    c:`<p>"你会怎么定义平凡？"</p><p>（作者提出来一个莫名其妙的问题，你陷入了沉思）</p>
+<p>"指普普通通？或是平静无波澜的日常？"</p><p>（作者只是叹了口气，未对你的回答做出任何评价）</p>
+<p>"或许我们每天的一切都是平凡的"</p><p>（你抬眼看向作者，轻声反问）</p>
+<p>"那平凡，是一件遗憾的事吗？"</p>
+<p>（作者垂眸，指尖轻轻摩挲着书页，语气平淡又温柔）</p>
+<p>"世人总觉得平凡是黯淡无光，是碌碌无为。"</p><p>"可我们所有人，终究都困在平凡里吗？"</p>
+<p>"不是困在其中"</p><p>（他缓缓摇头，语调轻柔）</p><p>"是生于平凡，活于平凡。"</p>
+<p>（你沉默片刻，又慢慢开口）</p><p>"那我们的坚持与奔赴，又有什么意义？"</p>
+<p>（他轻轻颔首，声音轻得像晚风拂过耳畔）</p>
+<p>"来看看这个吧，我或你或者是所有人的日记，在我们不断重复的辞藻与音节中，在晴天与阴天的交接中，换个角度看看，品味其意义"</p>
+<hr>
+<p><b>///9月28日 晴</b><br>闲来无事静静思索，到底什么才是真正的礼物。我们总是习惯性期待盛大的惊喜，执着于包装精致、价值昂贵的礼物，以为看得见的实物，才是生活给予的馈赠。我们追逐新鲜感，期盼突如其来的惊喜，却常常忽略了藏在烟火日常里最珍贵的温柔。世间最珍贵的礼物，从不会被标价定义。它可以是低谷时朋友不离不弃的陪伴，是家人日复一日细碎的牵挂，是失意时一句温柔的宽慰，是拼尽全力后自己给予的肯定。平凡日子里的善意、包容、偏爱与守候，都是千金难换的礼物。我慢慢懂得，外物终会更迭消散，唯有心底留存的温暖恒久绵长。</p>
+<p><b>///9月29日 多云</b><br>今天忽然在想，我们该如何定义好汉。提起好汉，很多人第一反应便是武功盖世、快意恩仇、能力各异。凭着一腔热血拔刀相助，凭着一身本领威震四方，凭着独门秘发释放电压，又或是凭着上古绝学燃烬一切？可很多时候，真正的好汉，未必拥有惊天动地的力量。每个人的生活里都藏着艰难的关卡，有难熬的低谷，有不为人知的煎熬。真正的好汉从不是从不跌倒，而是跌倒之后依然选择站起，守住心底的底线。</p>
+<p><b>///9月30日 多云</b><br>今天忽然在想，人总习惯轻易评判别人。看到一件事，听到几句话，我们下意识就会给出结论，贴上标签。凭着片段的见闻，就断定一个人的好坏；凭着一时的表象，评判他人的选择。可很多时候，我们看见的，不过是冰山露出水面的一角。每个人都有自己藏在背后的处境，有难言的苦衷，有不为人知的挣扎。未经全貌，不妄评人。</p>
+<p><b>///10月2日 多云</b><br>昨日窗外落着绵绵的雨，我静静思索何为哀。哀不只是放声大哭，也不全是撕心裂肺的悲痛。有时它安静地藏在心底，是无声的怅然，是对逝去之物的惋惜，是求而不得的遗憾。有时又像是滋滋电流，在心中激荡，在脑中传递。慢慢懂得，哀是内心的感知，让我们看见失去，也教会我们珍惜当下。</p>
+<p><b>///10月3日 阴</b><br>回望一路走来的青春，无数场大大小小的比赛，拼凑了我的成长轨迹。曾经的我，太过执着于比赛的输赢与结果。总以为赢就是一切，输就是全盘皆输。可历经一次次历练后才明白，比赛的意义从来不止输赢。真正珍贵的，是赛前日夜打磨的坚持，是临场沉着冷静的心态，是失误后迅速调整的勇气，是和对手并肩奔赴热爱的滚烫过程。</p>
+<p><b>///10月5日 晴</b><br>我时常在生活的低谷里，读懂普通人独有的复活。我们总在影视故事里期待轰轰烈烈的复活，期待绝境翻盘、一键重来的奇迹。可真实的人生从来没有凭空而来的救赎。但凡人的复活，从来都不是奇迹，而是自愈与重生。是熬过无人问津的黑夜，消化所有的委屈与不甘，收拾好破碎的情绪，再次抬起头奔赴前路。</p>
+<p><b>///10月6日 多云</b><br>总听人期盼前路是一片坦途。以前我以为坦途就是一路平顺，没有风雨，没有困境。可慢慢发现，人生本就少有现成的坦途。真正的坦途不在远方，而在一颗敢于向前的心。就算脚下曲折，只要不停止迈步，心之所向，便是坦途。</p>
+<p><b>///10月7日 多云</b><br>站在选择的路口，我体会到什么是踌躇。踌躇不是拒绝前行，而是内心反复掂量，在两种方向之间摇摆。踌躇源于顾虑，源于对失败的恐惧。可世上本没有完全稳妥的选择，一味停在原地反复思量，只会困住自己。想清楚之后，总要鼓起勇气，坚定地走向属于自己的方向。</p>
+<p><b>///10月9日 多云</b><br>放学路上，看见街边行人各式各样的穿搭，我忍不住思索时尚究竟是什么。大街上，潮流一波接着一波，今年流行的款式，明年或许就无人问津。时尚不该是一味模仿别人。它可以是简单干净的穿搭，是由内而外舒展的状态，是敢于坚持自己审美的底气。适合自己、让自己舒服自在，就是最好的时尚。</p>
+<p><b>///10月10日 阴</b><br>今日忽然深思，原来笑容从来都不止一种模样。长久以来，我们都默认笑容等同于快乐。可长大之后才慢慢看清，很多笑容都是藏着心事的伪装。笑是情绪的表达，不该是伪装的铠甲。允许自己有情绪的起伏，接纳不开心的时刻，珍惜发自内心、纯粹坦荡的笑意。随心而笑，坦然生活，才是最舒服的人生状态。</p>
+<p><b>///10月11日 晴</b><br>从前的我，一直固执地认为泪水是软弱的代名词。可慢慢长大才明白，泪水从来不是怯懦的证明，而是人心最真诚的出口。委屈积攒太久会落泪，全力以赴后的释然会落泪，被温柔治愈的感动会落泪，不舍离别、心怀遗憾也会落泪。眼泪从不是认输，而是情绪的释放与沉淀。</p>
+<p><b>///10月12日 多云</b><br>今天读到"申诉"二字，忽然有所感触。申诉，不是急躁的争辩，也不是歇斯底里的控诉。它是当委屈笼罩自身，在不公面前，冷静地陈述事实，为自己讨要一个公正的答复。申诉是一种维护正义的方式。它带着对公平的期盼，在规则之内，从容说出属于自己的声音。</p>
+<p><b>///10月13日 多云</b><br>捧着英语课本发呆的时候，我忽然有了新的想法。很多人学英语，仅仅把它当成必须完成的学习任务。可英语从来不止是试卷上的选项与填空。它是另一种表达的方式，能阅读异国的文字，听懂不一样的声音，看见另一片土地上的思想。语言是桥梁，学好英语，便是多了一种望向世界的方式。</p>
+<p><b>///10月14日 多云</b><br>晚自习休息时，我静下心来想，爱究竟是什么。从前总以为爱该是轰轰烈烈的告白，是盛大又耀眼的瞬间。可慢慢发现，更多的爱藏在细碎平淡的日常里。是深夜书桌旁温好的一杯热水，是失意时一句轻声的安慰，是长久的包容与默默的守候。爱不只有热烈，更多的是克制、体谅与长久的陪伴。</p>
+<p><b>///10月16日 晴</b><br>在漫长的求学岁月里，考试是贯穿始终的常态。曾经的我，极度畏惧每一场考试。总偏执地认为，一张试卷的分数，就能定义所有的努力。可经历无数次考试的打磨后，我终于慢慢释怀。考试从来不是人生的审判，只是一次普通的查漏补缺。分数只是一时的反馈，成长才是永恒的收获。</p>`,
+    h:[{t:'我毫无头绪',c:'找到对话中的重点，在大量日记中搜寻有效信息'},
+       {t:'我还是看不懂作者的话，可以翻译一下吗',c:'只有最后一句对话是重要的，寻找合适的天气并分析日记内容，再分析某个关键词，你就能得到一个合法单词'},
+       {t:'我想我已经完成作者的话的处理，接下来该怎么做',c:'根据你分析出的结论，在特定日记中寻找相关的词语，并将他们转换成某种特定的形式'},
+       {t:'我认为我已经找到了非常明确的字母串，如何处理',c:'你可以将他们拼凑出2个合法单词，并根据此猜出本题的成语答案'}]},
+  {id:'p_1789883295025',s:'s2',t:'normal',o:4,title:'第四章：致美好的理想',
+    c:`<p>（你与作者聊到自古以来人们的理想）</p><p>"唉，理想是多变的，没办法一直固定"</p>
+<p>（作者叹息，回忆起过去…）</p><p>"但理想是有好有坏的，对吗？"</p>
+<p>（你打断了他的回忆）</p><p>"嗯，或许你说得对，也或许不对"</p>
+<p>"哦？你是怎么看的？"</p><p>"与其用好与不好，不如用美好与平常"</p>
+<p>（作者看着你，认真地回答这个问题）</p><p>"那你见过什么样的理想呢？"</p>
+<p>"我的话…见过的不对，但论最美好的那可能是这个吧"</p><p>（你顺着作者手指的方向望去）</p>
+<p><b>///某位学生的演讲稿——我的理想：</b></p>
+<p>作为新时代的新青年，我们要有对美好生活的期待--来充实自我，来激励彼此，不困于眼前的满意之地。理想从不是悬在云顶的空想，而是藏在每一次伏案钻研之中。我们都未来可期，年轻的身体中有着燃不灭的火焰--代代相传，助力勇气、想象冲上云霄！这是我们的理想与意志力。</p>
+<p>"怎么样，很美好吧。要我说，这份理想就如同下面这幅画，站在边上都能够感受到满满的意志"</p>
+<p>（作者笑了笑，补充道）</p>
+<p>"每当我看见那些对齐的第二个我出现时，我都会有一种与他们共同离开，奔赴远方的冲动"</p>
+<img src="img/zmhdlx/P1.png">`,
+    h:[{t:'我毫无头绪',c:'你可以先从作者提及的演讲稿与画作入手，寻找某种匹配关系'},
+       {t:'我看不懂作者的话，可以给我翻译一下吗？',c:'着重探究画作的边框，借助提及的文本内容令其变得充满'},
+       {t:'我似乎完成了对演讲稿的处理，接下来怎么办？',c:'关注作者的最后一句话，对你原先处理完的画作进行进一步的处理'},
+       {t:'我得到了一个字符串，然后呢？',c:'该字符串指向了本次大赛的一个答案，结合作者的话，你就可以得出一个成语答案'}]},
+  {id:'p_1789883266217',s:'s2',t:'normal',o:5,title:'第五章：致伟大的英雄',
+    c:`<p>如果你看到这句话，说明作者迷路了，请你直接输入本题的答案：AUCRFEMA</p>`,
+    h:[{t:'我毫无头绪',c:'字母两两一组看即可'},
+       {t:'我还是毫无头绪，请求作者帮助',c:'作者被迫上线为你解答：试着往某个学科的符号表征上联系吧！'},
+       {t:'本题为何如此草率？一点没有深度',c:'因为本题的原文件丢了。只留下来你所看到的这一个'}]},
+  {id:'p_1789883308641',s:'s2',t:'meta',o:6,title:'FINAL CHAPTER：致…',
+    c:`<p>"如你所见，这是这篇史诗的终章，但它连名字都是空缺的。"</p>
+<p>（作者将笔递给你，转过身凝望漫天星辰）</p><p>"我？我也要写吗？"</p>
+<p>"对"</p><p>"好，好吧.....那这个终章该写点什么呢？"</p>
+<p>（作者嫣然一笑，缓缓开口）</p>
+<p>"不如就这样写吧：这一路上你见证了这世间的许多面孔，用成语留下独属于你的足迹，他们虽有时化身他人，但只有他们互相阻碍、互相抨击，才能勾勒出痕迹，点亮了这片黑夜，为史诗落下最华丽的一笔"</p>
+<p>（作者伸手指向黑夜，你顺着方向看去，却只看到了茫茫黑夜，等你再抬头时，作者已消失不见，证明他存在的，只有你手中的笔）</p>
+<img src="img/zhiwomensuoaide/P1.png">`,
+    h:[{t:'什么是meta',c:'Meta（元谜题）是需要用到所有该章节谜题答案才能解出的谜题'},
+       {t:'我毫无头绪',c:'想要完成作者的撰写委托，就必须仔细品读他给你留下的创作建议，据此你或许能得出事物间的某些联系'},
+       {t:'我还是看不懂作者的话，能给我翻译一下吗？',c:'在该PART的题目中，你都用成语书写了答案，仔细观察这几个成语并结合作者话中的关键词，就可以勾勒出一个特定图案'},
+       {t:'我想我已经找到本题的题眼了，接下来怎么办？',c:'这个题眼或许与黑夜中暗藏的数字有联系，比如代表题眼的数量？题眼的位置？'},
+       {t:'我还是看不透这片黑夜，请再给我进一步的提示',c:'如果你已经正确理解黑夜中数字的含义，那么这片黑夜一定代表着一个固定的事物，某种尺子或许是这个事物的特点'},
+       {t:'我要求助作者，可以帮我把题目的名字补充完整吗？',c:'你仿佛听到了作者在你耳边轻语：好吧，还是放不下你，但终章怎么能这么轻易就替你写好呢？这样吧，我再给你加几个字（作者把本题目名字改为：FINAL CHAPTER:致我们所爱的....）'}]},
+  {id:'p_1790604473893',s:'s3',t:'normal',o:1,title:'异相仲裁「草台班子」',
+    c:`<p>这是一道双人协作题。你和你的队友需要分工合作，分别解开各自的谜题，才能解锁最终大图。</p>
+<iframe src="extra/split.html" style="width:100%;height:700px;border:1px solid #ddd;border-radius:8px;"></iframe>`,
+    h:[]},
+  {id:'p_1789657766936',s:'s3',t:'normal',o:2,title:'三个字？！',
+    c:`<iframe src="extra/sanzimi.html" style="width:100%;height:600px;border:1px solid #ddd;border-radius:8px;"></iframe>`,
+    h:[{t:'请完成本题的玩家截图发给主办方获取答案',c:'请完成本题的玩家截图发给主办方获取答案'},
+       {t:'这是什么',c:'这是三字谜，每个问题只有三个字，你需要根据三个字猜出谜底'},
+       {t:'可以说第一区的类型吗',c:'游戏名称'},{t:'可以说第二区的类型吗',c:'历史人物'},
+       {t:'可以说第三区的类型吗',c:'地名（古城 / 山水）'},{t:'可以说第四区的类型吗',c:'动植物'},
+       {t:'可以说第五区的类型吗',c:'器物用品'},{t:'可以说第六区的类型吗',c:'典籍诗文'},
+       {t:'可以说第七区的类型吗',c:'天文地理概念'}]},
+  {id:'p_1789801092927',s:'s3',t:'normal',o:3,title:'神秘符号',
+    c:`<iframe src="extra/shenmifuhao.html" style="width:100%;height:700px;border:1px solid #ddd;border-radius:8px;"></iframe>`,
+    h:[{t:'这是什么',c:'《神秘符号》（综艺《游戏的法则 4》死亡竞赛，也叫神秘标志）'},
+       {t:'游戏规则',c:'1. 每一题，主持人预先定好一条固定、不变的运算规则，同时给出目标算式（X,Y），这是你最终要算出答案的式子。2. 双方轮流提交一对数字 (a,b) 作为测试样例，主持人用同一个隐藏公式算出并公布 f (a,b) 的结果。你可以用测试样例反推这个神秘法则。'},
+       {t:'为什么我做完了所有的题还没有通关',c:'因为这道题的目的并不是完成所有的题，这个游戏的规则是关键'},
+       {t:'我好像知道怎么做了',c:'为什么不尝试一下变为进制呢'}]},
+  {id:'p_1790218681753',s:'s3',t:'meta',o:4,title:'黑白黑白',
+    c:`<p>胜败乃兵家常事，抢占先机为赢家</p>
+<img src="img/hbhb/P1.png"><img src="img/hbhb/P2.png"><img src="img/hbhb/P3.png">`,
+    h:[{t:'这是什么种类的棋盘',c:'传统的xxx就是把五个字连成一条线，好无聊好无趣'},
+       {t:'我该如何理解两个世界线',c:'你需要通过对棋盘上的颜色推测该世界线上胜利的一方'},
+       {t:'我需要从两个世界线中得到什么',c:'找到两个世界线中两个棋盘重合的字（即"抢占先机"的含义）'},
+       {t:'我莫得灵感',c:'你得出来的"先机"连在一起是某部长篇短剧中某人物的名字的谐音，答案便是该人物的名字'}]},
+  {id:'p_1790604104878',s:'s4',t:'final',o:1,title:'esc+一切',
+    c:`<p>不要忘记这场比赛最初的目的是什么。</p><p>2，4</p>`,
+    h:[{t:'我看不懂题目',c:'你尝试把本次比赛的缩写展开呢？'},
+       {t:'序号什么意思',c:'给你一个提示，1，3→杨迪'}]}
+];
+const ANN = [
+  {t:1789743591789,c:`<p><b>BTPC 忙忙碌碌寻宝藏系列 · 景晨版本第三个宝藏公线赛</b>，赛制摘选改编自 CCBC 解谜赛核心逻辑。</p>
+<p><b>一、参赛规则与组队机制</b><br>1–2 人/队，禁止超员；每人仅可加入一队；禁止换队、代打。无年龄、学历、解谜基础限制。</p>
+<p><b>二、赛制结构与比赛节奏</b><br>报名：2026.09.20；比赛：2026.10.01 08:00 — 2026.10.07 20:00，共 7 天。答对最终谜题即为完赛，按首次答对时间排序。</p>
+<p><b>三、答题与答案提交规则</b><br>答案支持中英文、数字、短语；单题最高 20 次；正确/里程碑不扣次数，仅错误扣次数；部分题有里程碑答案。</p>
+<p><b>四、提示与柿币体系</b><br>柿币为唯一消费货币；可购买提示；自然增长速度随完赛队伍增加；提示仅限队内参考，严禁外泄。</p>
+<p><b>五、合规与违规处罚</b><br>允许：队内讨论、公开工具、公开资料。严禁：跨队交流、公开发布、代打、攻击平台、外泄提示。违者清零成绩、取消资格。</p>
+<p style="color:#c0451a"><b>⚠️ 以及：禁止攻击服务器！</b></p>`},
+  {t:1790733771084,c:'因为js中0=FALSE这个东西，导致部分队伍存在自然增加货币，已经修改，请每个队伍派出一人打开主界面的更多货币记录截图，发送给主办方。'},
+  {t:1790773382648,c:'恭喜队伍善战不排队获得本次比赛的首位首杀！'},
+  {t:1790774022389,c:'一道题「数……合」的题中的某个图片出现了问题，暂时无法修改，请见谅。'},
+  {t:1790775726448,c:'请无视 二相乐园代表队，那是主办方队，测试来的。'},
+  {t:1790777142084,c:'一道题「数……合」的风味文本进行了更改。'},
+  {t:1790778794087,c:'一道题「原…」的风味文本进行了更改，请刷新获取。'},
+  {t:1790818136873,c:'站内信系统正在维护中，使用站内信的玩家请将问题私聊给主办方。'},
+  {t:1790842089354,c:'恭喜 七缸－五缸发动机 成为第一个完成一区的队伍，货币增速将提升至49，人工提示降至10000。<br>兑换码：再不会让承诺被敷衍'},
+  {t:1790842798388,c:'一道题「第……………想」的题增加了图片。'},
+  {t:1790855977173,c:'一道题「.推..」的题修改了图片，请解锁的玩家进行查看。'}
+];
+</script>
+<script>
+/* ===== 工具 ===== */
+const SUB_K='btpc_sub_v3', UNL_K='btpc_unl_v3', PRF_K='btpc_prf_v3';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmt(t){const d=new Date(t),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+function fmtS(t){const d=new Date(t),p=n=>String(n).padStart(2,'0');return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+function load(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v;}catch(e){return d;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function norm(s){return String(s==null?'':s).trim().toLowerCase().replace(/[\s\u3000]+/g,' ').replace(/[，,]/g,'，');}
+function check(id,v){const n=norm(v);if(!n)return 'empty';const a=ANS[id]||[];if(a.indexOf('*')!==-1)return 'correct';for(const x of a)if(norm(x)===n)return 'correct';for(const x of (MS[id]||[]))if(norm(x)===n)return 'milestone';return 'wrong';}
+function solved(subs,id){return (subs[id]||[]).some(r=>r.r==='correct');}
+
+/* ===== 资源占位 ===== */
+function fixRes(root){
+  root.querySelectorAll('img').forEach(img=>{
+    const mark=()=>{if(img.dataset.f)return;img.dataset.f='1';
+      const src=img.getAttribute('src')||'未知';
+      const p=document.createElement('div');p.className='miss';
+      p.innerHTML='🖼️ 图片资源未归档：<code>'+esc(src)+'</code>';
+      img.replaceWith(p);};
+    if(img.complete&&img.naturalWidth===0)mark();else img.addEventListener('error',mark);
+  });
+  if(!ARCHIVE_HAS_ASSETS){
+    root.querySelectorAll('iframe').forEach(f=>{
+      const p=document.createElement('div');p.className='miss';
+      p.innerHTML='🧩 互动组件未归档：<code>'+esc(f.getAttribute('src')||'')+'</code>';
+      f.replaceWith(p);
+    });
+    root.querySelectorAll('audio').forEach(a=>{
+      const p=document.createElement('div');p.className='miss';
+      p.innerHTML='🎵 音频资源未归档：<code>'+esc(a.getAttribute('src')||'')+'</code>';
+      a.replaceWith(p);
+    });
+  }
+}
+
+/* ===== 渲染题目 ===== */
+function renderList(){
+  const list=$('list');list.innerHTML='';
+  const subs=load(SUB_K,{}),unl=load(UNL_K,{});
+  SECTIONS.forEach(sec=>{
+    const items=PUZ.filter(p=>p.s===sec.id).sort((a,b)=>a.o-b.o);
+    if(!items.length)return;
+    const h=document.createElement('div');h.className='sec';
+    h.innerHTML=`<span class="idx">${sec.label}</span><h2>${esc(sec.name)}</h2><span class="cnt">${items.length} 题</span>`;
+    list.appendChild(h);
+    items.forEach(p=>{
+      const card=document.createElement('article');card.className='puz';card.dataset.id=p.id;
+      card.dataset.k=(p.title+' '+sec.name+' '+TYPE[p.t]+' '+(p.h||[]).map(x=>x.t+' '+x.c.replace(/<[^>]+>/g,'')).join(' ')).toLowerCase();
+      const done=solved(subs,p.id);if(done)card.classList.add('done');
+      card.innerHTML=`
+        <div class="puz-h">
+          <div class="puz-idx">${p.o}</div>
+          <div class="puz-t">
+            <h3 class="puz-title">${esc(p.title)}${done?' <span class="tag ok">✓ 已完成</span>':''}</h3>
+            <div class="puz-tags"><span class="tag ${p.t[0]}">${TYPE[p.t]}</span><span class="tag">${(p.h||[]).length} 条提示</span></div>
+          </div>
+          <div class="arrow">▼</div>
+        </div>
+        <div class="puz-b">
+          <div class="body">${p.c}</div>
+          <div class="h-title">提示</div>
+          <div class="hbox"></div>
+          <div class="ans">
+            <h4>作答</h4>
+            <div class="ans-row"><input type="text" class="ai" placeholder="输入答案后回车或点击提交" ${done?'disabled':''}><button class="ab" ${done?'disabled':''}>${done?'已完成':'提交'}</button></div>
+            <div class="msg"></div>
+            <div class="recs"></div>
+          </div>
+        </div>`;
+      card.querySelector('.puz-h').addEventListener('click',()=>card.classList.toggle('open'));
+      const hbox=card.querySelector('.hbox');
+      const us=unl[p.id]||{};
+      if(!(p.h||[]).length){hbox.innerHTML='<div class="nohint">本题暂无归档提示。</div>';}
+      else{p.h.forEach((x,i)=>{
+        const d=document.createElement('div');d.className='hint'+(us[i]?' un':'');
+        d.innerHTML=`<div class="hint-h"><span class="ico">${us[i]?'🔓':'🔒'}</span><span>提示 ${i+1}：${esc(x.t||'')}</span><span class="ar">▼</span></div><div class="hint-b">${x.c||''}</div>`;
+        d.querySelector('.hint-h').addEventListener('click',e=>{e.stopPropagation();
+          const now=!d.classList.contains('un');d.classList.toggle('un',now);
+          d.querySelector('.ico').textContent=now?'🔓':'🔒';
+          const u=load(UNL_K,{});if(!u[p.id])u[p.id]={};
+          if(now)u[p.id][i]=1;else delete u[p.id][i];save(UNL_K,u);
+        });
+        hbox.appendChild(d);
+      });}
+      const input=card.querySelector('.ai'),btn=card.querySelector('.ab'),msg=card.querySelector('.msg'),rc=card.querySelector('.recs');
+      function renderRec(){
+        const all=load(SUB_K,{});const arr=all[p.id]||[];
+        if(!arr.length){rc.innerHTML='';return;}
+        let html='<div class="rec-title">提交记录（'+arr.length+'）</div>';
+        arr.slice().reverse().forEach(r=>{
+          let cls='bad',txt='错误';
+          if(r.r==='correct'){cls='ok';txt='正确';}else if(r.r==='milestone'){cls='ms';txt='里程碑';}
+          html+=`<div class="rec"><span class="rec-t ${cls}">${txt}</span><span class="rec-a">${esc(r.a)}</span><span class="rec-tm">${fmtS(r.t)}</span></div>`;
+        });
+        html+='<button class="rec-clr">清除本题记录</button>';
+        rc.innerHTML=html;
+        rc.querySelector('.rec-clr').addEventListener('click',e=>{e.stopPropagation();
+          if(!confirm('确定清除本题的全部提交记录吗？'))return;
+          const a=load(SUB_K,{});delete a[p.id];save(SUB_K,a);renderRec();
+          msg.textContent='';msg.className='msg';renderProg();
+        });
+      }
+      renderRec();
+      function doSub(){
+        if(card.classList.contains('done'))return;
+        const v=input.value.trim();
+        if(!v){msg.textContent='请先输入答案。';msg.className='msg bad';return;}
+        const r=check(p.id,v);
+        const all=load(SUB_K,{});if(!all[p.id])all[p.id]=[];
+        all[p.id].push({a:v,r:r,t:Date.now()});save(SUB_K,all);
+        if(r==='correct'){
+          msg.textContent=p.t==='final'?'✓ 恭喜完赛！':'✓ 回答正确！';msg.className='msg ok';
+          card.classList.add('done');
+          const te=card.querySelector('.puz-title');
+          if(te&&!te.querySelector('.tag.ok'))te.insertAdjacentHTML('beforeend',' <span class="tag ok">✓ 已完成</span>');
+          input.disabled=true;btn.disabled=true;btn.textContent='已完成';renderProg();
+        }else if(r==='milestone'){msg.textContent='◐ 这是里程碑答案，方向正确，但还不是最终答案。';msg.className='msg tip';}
+        else{msg.textContent='✗ 答案不正确，再想想。';msg.className='msg bad';}
+        input.value='';renderRec();input.focus();
+      }
+      btn.addEventListener('click',e=>{e.stopPropagation();doSub();});
+      input.addEventListener('click',e=>e.stopPropagation());
+      input.addEventListener('keydown',e=>{if(e.key==='Enter')doSub();});
+      list.appendChild(card);
+    });
+  });
+  fixRes(list);renderProg();
+}
+
+/* ===== 进度 ===== */
+function renderProg(){
+  const page=$('page-puz');if(!page)return;
+  let bar=$('prog');
+  if(!bar){bar=document.createElement('div');bar.id='prog';bar.className='prog';
+    page.insertBefore(bar,page.querySelector('.search'));}
+  const subs=load(SUB_K,{});const total=PUZ.length;
+  let s=0;PUZ.forEach(p=>{if(solved(subs,p.id))s++;});
+  const pct=total?Math.round(s/total*100):0;
+  bar.innerHTML=`<span>已完成 <b>${s}</b> / ${total}</span><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span class="pct">${pct}%</span>`;
+}
+
+/* ===== 公告 ===== */
+function renderAnn(){
+  const list=$('anl');list.innerHTML='';$('anc').textContent=ANN.length;
+  ANN.forEach((a,i)=>{
+    const el=document.createElement('div');el.className='ann';
+    el.innerHTML=`<div class="ann-h"><span class="bg">#${i+1}</span><span>${fmt(a.t)}</span></div><div class="ann-b">${a.c}</div>`;
+    list.appendChild(el);
+  });
+  fixRes(list);
+}
+
+/* ===== 导航 ===== */
+function initNav(){
+  document.querySelectorAll('.nav button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+      $('page-'+b.dataset.p).classList.add('on');
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  });
+}
+
+/* ===== 搜索 ===== */
+function initSearch(){
+  $('search').addEventListener('input',()=>{
+    const kw=$('search').value.trim().toLowerCase();let cnt=0;
+    document.querySelectorAll('.puz').forEach(c=>{
+      const ok=!kw||c.dataset.k.includes(kw);
+      c.style.display=ok?'':'none';if(ok)cnt++;
+    });
+    document.querySelectorAll('.sec').forEach(h=>{
+      let n=h.nextElementSibling,any=false;
+      while(n&&!n.classList.contains('sec')){if(n.classList.contains('puz')&&n.style.display!=='none'){any=true;break;}n=n.nextElementSibling;}
+      h.style.display=any?'':'none';
+    });
+    let em=$('em');
+    if(cnt===0){if(!em){em=document.createElement('div');em.id='em';em.className='nohint';em.style.textAlign='center';em.style.padding='40px';em.textContent='没有找到匹配的题目。';$('list').appendChild(em);}}
+    else if(em)em.remove();
+  });
+}
+
+/* ===== 身份 ===== */
+function who(){
+  const p=load(PRF_K,{})||{};
+  $('wt').textContent=p.team||'匿名队伍';
+  $('wp').textContent=p.player||'匿名选手';
+}
+function openGate(isEdit){
+  const p=load(PRF_K,{})||{};
+  $('in-team').value=isEdit?(p.team||''):'';
+  $('in-player').value=isEdit?(p.player||''):'';
+  $('gate').classList.remove('hide');
+  setTimeout(()=>$('in-team').focus(),60);
+}
+function closeGate(){$('gate').classList.add('hide');}
+function initGate(){
+  const go=()=>{
+    const t=$('in-team').value.trim()||'匿名队伍';
+    const p=$('in-player').value.trim()||'匿名选手';
+    save(PRF_K,{team:t,player:p,at:Date.now()});
+    who();closeGate();
+  };
+  $('enter').addEventListener('click',go);
+  $('in-team').addEventListener('keydown',e=>{if(e.key==='Enter')$('in-player').focus();});
+  $('in-player').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+  $('edit').addEventListener('click',()=>openGate(true));
+}
+
+/* ===== 启动 ===== */
+(function(){
+  renderList();renderAnn();initNav();initSearch();initGate();
+  const p=load(PRF_K,null);
+  if(!p)openGate(false);else who();
+})();
+</script>
+</body>
+</html>

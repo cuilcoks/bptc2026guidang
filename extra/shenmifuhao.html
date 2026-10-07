@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BPTC神秘符号</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,sans-serif}
+body{max-width:1100px;margin:16px auto;padding:0 14px;background:#1a1a22;color:#eee}
+h1{text-align:center;color:#e6c060;font-size:clamp(18px,4vw,24px)}
+h3{margin:0 0 8px;font-size:15px;color:#b8b8d0}
+.box{background:#272733;padding:14px;border-radius:10px;margin:10px 0}
+input{padding:8px;width:90px;margin:4px;border-radius:6px;border:none;font-size:14px;background:#1a1a22;color:#eee}
+button{padding:8px 14px;margin:4px;border:none;border-radius:6px;background:#4477dd;color:#fff;cursor:pointer;font-size:14px}
+button:hover{filter:brightness(1.1)}
+button:disabled{background:#444;color:#888;cursor:not-allowed}
+button.refill{background:#e8622f}
+button.refill:hover{filter:brightness(1.15)}
+#log{height:240px;overflow-y:auto;background:#111;padding:10px;border-radius:8px;white-space:pre-wrap;font-size:13px;line-height:1.6}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sync{font-size:12px;color:#888;text-align:right;margin-top:6px}
+.warn{color:#f6a84b;font-size:13px;margin-top:6px;}
+</style>
+</head>
+<body>
+<h1>🔮 神秘符号【队伍共享版】</h1>
+
+<div class="box">
+  <h3>本局信息</h3>
+  <p>当前关卡：<span id="levelNum">1</span></p>
+  <p>目标：算出隐藏算式 F(<span id="tA">?</span> , <span id="tB">?</span> , <span id="tC">?</span> , <span id="tD">?</span>) 的答案</p>
+  <p>剩余测试次数：<span id="testLeft">10</span> / <span id="maxTest">10</span>（第<span id="refillCount">0</span>次恢复）</p>
+  <p class="warn">⚠️ 答对仍可继续提交，每次提交（测试或最终答案）都会消耗 1 次机会</p>
+  <button id="btnNew" onclick="newRound()">🎲 开启当前关卡</button>
+  <button onclick="prevLevel()">⬅️ 上一关</button>
+  <button onclick="nextLevel()">➡️ 下一关</button>
+  <button id="refillBtn" class="refill" style="display:none;" onclick="buyRefill()">💸 花 5000 柿币恢复 10 次</button>
+</div>
+
+<div class="box">
+  <h3>提交测试样例 (A,B,C,D)</h3>
+  <div class="row">
+    <input id="inA" placeholder="A" type="number">
+    <input id="inB" placeholder="B" type="number">
+    <input id="inC" placeholder="C" type="number">
+    <input id="inD" placeholder="D" type="number">
+    <button id="testBtn" onclick="submitTest()">提交测试</button>
+  </div>
+  <div class="row" style="margin-top:8px;">
+    <input id="guessAns" placeholder="F答案" type="number">
+    <button onclick="submitGuess()">🔥 提交最终答案</button>
+  </div>
+</div>
+
+<div class="box">
+  <h3>📜 对局日志（队伍共享）</h3>
+  <div id="log"></div>
+  <div class="sync" id="syncStatus">正在同步…</div>
+</div>
+
+<script>
+const levelSymbols = [
+  "+-*", "+*+", "+/-", "++*", "+++", "+/+", "+//", "+++", "-+-", "+*+",
+  "---", "+-+", "-+-", "+/+", "+/*", "--+", "-+/", "+-/"
+];
+
+function applyRule(sym, a, b, c, d) {
+  const op1 = sym[0], op2 = sym[1], op3 = sym[2];
+  function op(x, o, y) {
+    if (o === '+') return x + y;
+    if (o === '-') return x - y;
+    if (o === '*') return x * y;
+    if (o === '/') return y === 0 ? NaN : x / y;
+    return NaN;
+  }
+  return op(op(op(a, op1, b), op2, c), op3, d);
+}
+
+// state = {
+//   currentLevel: 1,
+//   levels: { "1": { testCount, refills, solved, active, targetA, targetB, targetC, targetD, targetAns, symbol }, ... },
+//   logs: []
+// }
+let state = {
+  currentLevel: 1,
+  levels: {},
+  logs: []
+};
+
+const logEl = document.getElementById('log');
+const syncStatus = document.getElementById('syncStatus');
+
+function getLevelData(level) {
+  if (!state.levels) state.levels = {};
+  if (!state.levels[level]) {
+    state.levels[level] = { testCount: 0, refills: 0, solved: false, active: false };
+  }
+  return state.levels[level];
+}
+
+function getMaxTest(level) {
+  const lv = getLevelData(level);
+  return 10 + (lv.refills || 0) * 10;
+}
+
+function renderAll() {
+  const lv = state.currentLevel || 1;
+  const data = getLevelData(lv);
+  const maxTest = getMaxTest(lv);
+  const usedAll = (data.testCount || 0) >= maxTest;
+
+  document.getElementById('levelNum').innerText = lv;
+  document.getElementById('levelNum').style.color = data.solved ? '#4fb286' : '';
+  document.getElementById('testLeft').innerText = Math.max(0, maxTest - (data.testCount || 0));
+  document.getElementById('maxTest').innerText = maxTest;
+  document.getElementById('refillCount').innerText = data.refills || 0;
+
+  document.getElementById('tA').innerText = data.active ? (data.targetA ?? '?') : '?';
+  document.getElementById('tB').innerText = data.active ? (data.targetB ?? '?') : '?';
+  document.getElementById('tC').innerText = data.active ? (data.targetC ?? '?') : '?';
+  document.getElementById('tD').innerText = data.active ? (data.targetD ?? '?') : '?';
+
+  // 按钮状态（不再因 solved 禁用）
+  document.getElementById('btnNew').disabled = !!data.active;
+  document.getElementById('testBtn').disabled = !data.active || usedAll;
+  document.getElementById('refillBtn').style.display = usedAll ? 'inline-block' : 'none';
+
+  logEl.innerText = (state.logs || []).join('\n');
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function logMsg(msg) {
+  state.logs = state.logs || [];
+  state.logs.push(msg);
+  if (state.logs.length > 300) state.logs = state.logs.slice(-300);
+  renderAll();
+}
+
+// ===== 与父页面通信 =====
+function requestRemote() {
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'getSymbolProgress' }, '*');
+  }
+}
+function pushState() {
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'saveSymbolProgress', data: state }, '*');
+  }
+}
+
+window.addEventListener('message', (e) => {
+  if (!e.data || !e.data.type) return;
+  if (e.data.type === 'symbolProgress') {
+    const remote = e.data.data;
+    if (remote && remote.levels) {
+      state = {
+        currentLevel: remote.currentLevel || 1,
+        levels: remote.levels || {},
+        logs: remote.logs || []
+      };
+      renderAll();
+      syncStatus.textContent = '✓ 已同步';
+      syncStatus.style.color = '#34c759';
+    } else {
+      syncStatus.textContent = '✓ 使用本地进度';
+    }
+  }
+  if (e.data.type === 'symbolRefillResult') {
+    const r = e.data.data || {};
+    if (r.success && r.progress) {
+      state = {
+        currentLevel: r.progress.currentLevel || state.currentLevel,
+        levels: r.progress.levels || {},
+        logs: r.progress.logs || state.logs
+      };
+      logMsg('💸 花费 5000 柿币，本关恢复 10 次测试机会');
+      renderAll();
+      pushState();
+    } else {
+      logMsg('❌ 恢复失败：' + (r.error || '未知错误'));
+    }
+  }
+});
+
+// ===== 操作 =====
+function newRound() {
+  const lv = state.currentLevel || 1;
+  const data = getLevelData(lv);
+  if (data.active) { logMsg('⚠️ 本关已开启，请直接测试或提交答案'); return; }
+
+  const sym = levelSymbols[lv - 1];
+  if (!sym) { logMsg('⚠️ 无效关卡'); return; }
+  const tA = Math.floor(Math.random() * 12) - 4;
+  const tB = Math.floor(Math.random() * 12) - 4;
+  const tC = Math.floor(Math.random() * 12) - 4;
+  const tD = Math.floor(Math.random() * 12) - 4;
+  const tAns = applyRule(sym, tA, tB, tC, tD);
+
+  data.active = true;
+  data.solved = false;   // 重新开启视为新局，清除已解标记
+  data.symbol = sym;
+  data.targetA = tA;
+  data.targetB = tB;
+  data.targetC = tC;
+  data.targetD = tD;
+  data.targetAns = tAns;
+  data.testCount = 0;
+  data.refills = 0;
+
+  logMsg(`===== 关卡${lv} 开始！目标 F(${tA},${tB},${tC},${tD})，共 10 次测试机会 =====`);
+  renderAll();
+  pushState();
+}
+
+function submitTest() {
+  const lv = state.currentLevel || 1;
+  const data = getLevelData(lv);
+  if (!data.active) { logMsg('⚠️ 请先开启当前关卡'); return; }
+  const maxTest = getMaxTest(lv);
+  if ((data.testCount || 0) >= maxTest) {
+    logMsg('⚠️ 测试次数已用尽，请花 5000 柿币恢复');
+    renderAll();
+    return;
+  }
+  const A = Number(document.getElementById('inA').value);
+  const B = Number(document.getElementById('inB').value);
+  const C = Number(document.getElementById('inC').value);
+  const D = Number(document.getElementById('inD').value);
+  if ([A, B, C, D].some(v => isNaN(v))) { logMsg('⚠️ 请输入有效的 A/B/C/D'); return; }
+
+  const res = applyRule(data.symbol, A, B, C, D);
+  data.testCount = (data.testCount || 0) + 1;
+  logMsg(`测试 (${A},${B},${C},${D}) → ${res}`);
+  renderAll();
+  pushState();
+}
+
+function submitGuess() {
+  const lv = state.currentLevel || 1;
+  const data = getLevelData(lv);
+  if (!data.active) { logMsg('⚠️ 关卡未开启'); return; }
+  const maxTest = getMaxTest(lv);
+  if ((data.testCount || 0) >= maxTest) {
+    logMsg('⚠️ 次数已用尽，请花 5000 柿币恢复');
+    return;
+  }
+  const g = Number(document.getElementById('guessAns').value);
+  if (isNaN(g)) { logMsg('⚠️ 请输入有效的答案'); return; }
+
+  // 提交最终答案同样扣 1 次
+  data.testCount = (data.testCount || 0) + 1;
+
+  if (g === data.targetAns) {
+    data.solved = true;
+    logMsg(`✅ 答案正确！关卡${lv}完成！F(${data.targetA},${data.targetB},${data.targetC},${data.targetD})=${data.targetAns}（可继续提交，每次消耗 1 次机会）`);
+  } else {
+    logMsg('❌ 答案错误！可以继续测试或提交答案');
+  }
+  renderAll();
+  pushState();
+}
+
+function prevLevel() {
+  if ((state.currentLevel || 1) > 1) {
+    state.currentLevel = state.currentLevel - 1;
+    logMsg(`👈 切换到关卡${state.currentLevel}`);
+    renderAll();
+    pushState();
+  } else {
+    logMsg('⚠️ 已经是第 1 关，无法往前');
+  }
+}
+
+function nextLevel() {
+  if ((state.currentLevel || 1) < levelSymbols.length) {
+    state.currentLevel = state.currentLevel + 1;
+    logMsg(`👉 切换到关卡${state.currentLevel}`);
+    renderAll();
+    pushState();
+  } else {
+    logMsg('🎉 已经到达最后一关');
+  }
+}
+
+function buyRefill() {
+  const lv = state.currentLevel || 1;
+  const data = getLevelData(lv);
+  const maxTest = getMaxTest(lv);
+  if ((data.testCount || 0) < maxTest) {
+    logMsg('⚠️ 次数还没用完，无需恢复');
+    return;
+  }
+  if (!confirm('确定花费 5000 柿币，为第' + lv + '关恢复 10 次测试机会吗？')) return;
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'symbolRefill', data: { level: lv } }, '*');
+  } else {
+    logMsg('⚠️ 无法连接主页面，请刷新');
+  }
+}
+
+// ===== 初始化 =====
+renderAll();
+requestRemote();
+setInterval(requestRemote, 2000);
+</script>
+</body>
+</html>

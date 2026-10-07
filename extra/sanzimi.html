@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>离谱の三字谜</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,sans-serif; }
+        body { background-color:#111827; color:#f3f4f6; min-height:100vh; padding:20px 12px; }
+        .container { max-width:720px; margin:0 auto; }
+        h1 { text-align:center; margin-bottom:16px; color:#60a5fa; font-size:clamp(1.5rem,5vw,2rem); }
+        .global-progress { text-align:center; margin-bottom:20px; color:#d1d5db; font-size:clamp(0.95rem,3vw,1.05rem); }
+        .zone-card { background:#1f2937; border-radius:12px; padding:18px 16px; margin-bottom:16px; border:1px solid #374151; }
+        .zone-title { font-size:clamp(1.1rem,4vw,1.25rem); margin-bottom:16px; color:#93c5fd; }
+        .riddle-item { margin-bottom:16px; }
+        .riddle-text { font-size:clamp(1rem,3.8vw,1.1rem); margin-bottom:6px; }
+        input[type="text"] { width:100%; padding:9px 10px; border-radius:8px; border:1px solid #4b5563; background:#111827; color:#fff; font-size:1rem; }
+        .tip { margin-top:3px; font-size:0.85rem; }
+        .ok { color:#34d399; }
+        .wrong { color:#f87171; }
+        .complete-notice { color:#34d399; font-weight:bold; margin-top:14px; font-size:clamp(1rem,3.5vw,1.1rem); display:none; }
+        #resetAll { margin-bottom:16px; padding:8px 14px; background:#6b7280; color:white; border:none; border-radius:8px; cursor:pointer; font-size:0.95rem; }
+        .sync-status { text-align:center; font-size:0.8rem; color:#6b7280; margin-top:10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>三字谜闯关</h1>
+        <button id="resetAll">重置全部关卡</button>
+        <div class="global-progress">当前可挑战：第 <span id="currentZone">1</span> 大区</div>
+        <div id="zoneWrapper"></div>
+        <div class="sync-status" id="syncStatus">正在同步…</div>
+    </div>
+
+    <script>
+        const zoneData = [
+            { title:"大区 1", riddles:[
+                {q:"踏星海", ans:"星穹铁道"},{q:"猎异鬼", ans:"永劫无间"},
+                {q:"筑方界", ans:"我的世界"},{q:"寻遗墟", ans:"遗迹2"},
+                {q:"驭机甲", ans:"绝区零"},{q:"守危城", ans:"明日方舟"}
+            ], finishText:"✅ 本大区全部答对，已解锁下一大区！"},
+            { title:"大区 2", riddles:[
+                {q:"御长风", ans:"苏轼"},{q:"怀赤壁", ans:"周瑜"},
+                {q:"饮浊醪", ans:"陶渊明"},{q:"出函谷", ans:"老子"},
+                {q:"定三江", ans:"孙权"},{q:"吟蜀道", ans:"李白"}
+            ], finishText:"✅ 本大区全部答对，已解锁下一大区！"},
+            { title:"大区 3", riddles:[
+                {q:"筑城郭", ans:"平遥"},{q:"枕大河", ans:"洛阳"},
+                {q:"悬飞瀑", ans:"庐山"},{q:"卧丘峦", ans:"黄山"},
+                {q:"临沧海", ans:"青岛"},{q:"锁雄关", ans:"嘉峪关"}
+            ], finishText:"✅ 本大区全部答对，已解锁下一大区！"},
+            { title:"大区 4", riddles:[
+                {q:"披素纱", ans:"白鹭"},{q:"立寒枝", ans:"寒梅"},
+                {q:"盘长须", ans:"玉米"},{q:"藏厚壳", ans:"核桃"},
+                {q:"卷青藤", ans:"牵牛花"},{q:"缀红实", ans:"樱桃"}
+            ], finishText:"✅ 本大区全部答对，已解锁下一大区！"},
+            { title:"大区 5", riddles:[
+                {q:"载诗书", ans:"书箱"},{q:"研墨痕", ans:"砚台"},
+                {q:"织素帛", ans:"织机"},{q:"持短炬", ans:"火把"},
+                {q:"悬圆镜", ans:"铜镜"},{q:"调弦音", ans:"古琴"}
+            ], finishText:"✅ 本大区全部答对，已解锁下一大区！"},
+            { title:"大区 6", riddles:[
+                {q:"记兴衰", ans:"史记"},{q:"咏离骚", ans:"楚辞"},
+                {q:"述春秋", ans:"左传"},{q:"传论语", ans:"论语"},
+                {q:"叹长恨", ans:"长恨歌"},{q:"赋秋水", ans:"庄子"}
+            ], finishText:"✅ 本大区全部答对，已解锁下一大区！"},
+            { title:"大区 7", riddles:[
+                {q:"弯如钩", ans:"新月"},{q:"涌沧波", ans:"海洋"},
+                {q:"落惊雷", ans:"雷电"},{q:"升朝旭", ans:"朝阳"},
+                {q:"覆云幕", ans:"阴天"},{q:"峙群峰", ans:"山脉"}
+            ], finishText:"🎉 恭喜！全部7大区通关！"}
+        ];
+
+        let unlockedZoneIndex = 0;
+        let savedInputs = {};
+        let notifiedComplete = false;
+        let isApplyingRemote = false;
+
+        const wrapper = document.getElementById("zoneWrapper");
+        const currentZoneLabel = document.getElementById("currentZone");
+        const syncStatus = document.getElementById("syncStatus");
+
+        function requestRemoteProgress(){
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'getSanzimiProgress' }, '*');
+            }
+        }
+
+        function pushProgressToServer(){
+            if (isApplyingRemote) return;
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'saveSanzimiProgress',
+                    data: { unlockedZoneIndex, savedInputs, completed: notifiedComplete }
+                }, '*');
+            }
+        }
+
+        window.addEventListener('message', (e) => {
+            if (!e.data || e.data.type !== 'sanzimiProgress') return;
+            const remote = e.data.data;
+            if (remote) {
+                applyRemoteProgress(remote);
+                syncStatus.textContent = '✓ 已同步';
+                syncStatus.style.color = '#34d399';
+            } else {
+                syncStatus.textContent = '✓ 使用本地进度';
+            }
+        });
+
+        function applyRemoteProgress(remote){
+            const remoteUnlocked = remote.unlockedZoneIndex || 0;
+            const remoteInputs = remote.savedInputs || {};
+            const remoteCompleted = !!remote.completed;
+
+            const localCorrect = countCorrect(savedInputs);
+            const remoteCorrect = countCorrect(remoteInputs);
+
+            if (remoteUnlocked > unlockedZoneIndex || remoteCorrect > localCorrect) {
+                isApplyingRemote = true;
+                unlockedZoneIndex = Math.max(unlockedZoneIndex, remoteUnlocked);
+                notifiedComplete = notifiedComplete || remoteCompleted;
+
+                const merged = { ...savedInputs };
+                for (const k in remoteInputs) {
+                    if (!merged[k]) {
+                        merged[k] = remoteInputs[k];
+                    } else if (!isCorrectInput(k, merged[k]) && isCorrectInput(k, remoteInputs[k])) {
+                        merged[k] = remoteInputs[k];
+                    }
+                }
+                savedInputs = merged;
+                renderAll();
+                isApplyingRemote = false;
+            }
+        }
+
+        function isCorrectInput(key, val){
+            const [z, r] = key.split('-').map(Number);
+            if (!zoneData[z] || !zoneData[z].riddles[r]) return false;
+            return cleanStr(val) === cleanStr(zoneData[z].riddles[r].ans);
+        }
+
+        function countCorrect(map){
+            let c = 0;
+            for (const k in map) {
+                if (isCorrectInput(k, map[k])) c++;
+            }
+            return c;
+        }
+
+        function renderAll(){
+            currentZoneLabel.innerText = unlockedZoneIndex + 1;
+            wrapper.innerHTML = '';
+            for (let i = 0; i <= unlockedZoneIndex; i++) {
+                renderZone(i);
+            }
+            wrapper.querySelectorAll('.zone-card').forEach(card => {
+                checkZoneCompleteSilent(card);
+            });
+        }
+
+        function renderZone(zoneIdx){
+            const data = zoneData[zoneIdx];
+            let html = `<div class="zone-card" data-zone="${zoneIdx}">
+                <div class="zone-title">${data.title}</div>`;
+            data.riddles.forEach((r, rIdx) => {
+                const key = zoneIdx + '-' + rIdx;
+                const savedVal = savedInputs[key] || '';
+                const isCorrect = savedVal && cleanStr(savedVal) === cleanStr(r.ans);
+                html += `
+                <div class="riddle-item">
+                    <div class="riddle-text">${r.q}</div>
+                    <input type="text" data-ans="${r.ans}" data-key="${key}" value="${savedVal.replace(/"/g,'&quot;')}">
+                    <div class="tip ${isCorrect ? 'ok' : ''}">${isCorrect ? '✓ 正确' : ''}</div>
+                </div>`;
+            });
+            html += `<div class="complete-notice" style="display:none;">${data.finishText}</div></div>`;
+            wrapper.insertAdjacentHTML('beforeend', html);
+
+            const cardDom = wrapper.querySelector(`[data-zone="${zoneIdx}"]`);
+            const inputs = cardDom.querySelectorAll("input");
+            inputs.forEach(input => {
+                input.addEventListener("keydown", e => { if (e.key === "Enter") checkAnswer(input); });
+                input.addEventListener("blur", () => checkAnswer(input));
+                input.addEventListener("input", () => {
+                    savedInputs[input.dataset.key] = input.value;
+                    pushProgressToServer();
+                    checkAllDone();
+                });
+            });
+        }
+
+        function cleanStr(s){ return (s || '').trim(); }
+
+        function checkAnswer(inputEl){
+            const correctAns = cleanStr(inputEl.dataset.ans);
+            const userAns = cleanStr(inputEl.value);
+            const tipDom = inputEl.nextElementSibling;
+            const key = inputEl.dataset.key;
+
+            savedInputs[key] = inputEl.value;
+            pushProgressToServer();
+
+            if (!userAns) {
+                tipDom.textContent = "";
+                tipDom.className = "tip";
+                checkAllDone();
+                return;
+            }
+            if (userAns === correctAns) {
+                tipDom.textContent = "✓ 正确";
+                tipDom.className = "tip ok";
+            } else {
+                tipDom.textContent = "✗ 错误";
+                tipDom.className = "tip wrong";
+            }
+            checkZoneComplete(inputEl.closest(".zone-card"));
+            checkAllDone();
+        }
+
+        function checkAllDone(){
+            for (let i = 0; i < zoneData.length; i++) {
+                for (let j = 0; j < zoneData[i].riddles.length; j++) {
+                    if (!isCorrectInput(i + '-' + j, savedInputs[i + '-' + j])) return false;
+                }
+            }
+            if (!notifiedComplete) {
+                notifiedComplete = true;
+                pushProgressToServer();
+            }
+            return true;
+        }
+
+        function checkZoneComplete(zoneCard){
+            const inputs = zoneCard.querySelectorAll("input");
+            let allRight = true;
+            inputs.forEach(inp => {
+                if (!inp.nextElementSibling.classList.contains("ok")) allRight = false;
+            });
+            const notice = zoneCard.querySelector(".complete-notice");
+            const zoneIdx = Number(zoneCard.dataset.zone);
+
+            if (allRight) {
+                notice.style.display = "block";
+                if (zoneIdx + 1 < zoneData.length && zoneIdx + 1 > unlockedZoneIndex) {
+                    unlockedZoneIndex = zoneIdx + 1;
+                    pushProgressToServer();
+                    renderAll();
+                    setTimeout(() => {
+                        const newCard = wrapper.querySelector(`[data-zone="${unlockedZoneIndex}"]`);
+                        if (newCard) newCard.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 100);
+                }
+            } else {
+                notice.style.display = "none";
+            }
+        }
+
+        function checkZoneCompleteSilent(zoneCard){
+            const inputs = zoneCard.querySelectorAll("input");
+            let allRight = true;
+            inputs.forEach(inp => {
+                if (!inp.nextElementSibling.classList.contains("ok")) allRight = false;
+            });
+            const notice = zoneCard.querySelector(".complete-notice");
+            notice.style.display = allRight ? "block" : "none";
+        }
+
+        document.getElementById("resetAll").onclick = function(){
+            if (!confirm('确定重置全部进度？此操作会同步给队友。')) return;
+            unlockedZoneIndex = 0;
+            savedInputs = {};
+            notifiedComplete = false;
+            pushProgressToServer();
+            renderAll();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        };
+
+        renderAll();
+        requestRemoteProgress();
+        setInterval(requestRemoteProgress, 3000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>揭字游戏</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,"Microsoft Yahei",sans-serif;}
+body{background-color:#f7f8f9;padding:20px 10px;}
+h1{text-align:center;font-size:28px;color:#222;margin-bottom:20px;font-weight:bold;}
+.block-container{
+  background:#fff;border:1px solid #dee2e6;border-radius:16px;
+  padding:20px 14px;margin:0 auto 20px;max-width:100%;overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.symbol,.hit{
+  display:inline-block;width:14px;height:14px;
+  font-size:12px;text-align:center;line-height:14px;
+}
+.symbol{color:#444;} .hit{color:#e63946;font-weight:bold;}
+.line{margin:2px 0;white-space:nowrap;}
+.control-wrap{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:20px;}
+#inputIdiom{width:260px;padding:10px 14px;font-size:16px;border:1px solid #adb5bd;border-radius:8px;outline:none;}
+button{padding:10px 24px;font-size:16px;border:none;border-radius:8px;cursor:pointer;}
+#submitBtn{background:#348eda;color:#fff;} #resetBtn{background:#868e96;color:#fff;}
+.record-area{max-width:100%;margin:0 auto;background:#fff;border-radius:16px;border:1px solid #dee2e6;padding:14px 16px;}
+.record-area h3{margin-bottom:10px;font-size:16px;} #recordList{font-size:14px;max-height:200px;overflow-y:auto;}
+.record-item{padding:2px 0;border-bottom:1px dashed #eee;} .record-item:last-child{border-bottom:none;}
+.correct{color:#229922;} .wrong{color:#dd3333;}
+@media (max-width: 640px) {
+    body{padding:10px 6px;} h1{font-size:22px;}
+    #inputIdiom{width:200px;font-size:14px;padding:8px 10px;}
+    button{padding:8px 16px;font-size:14px;}
+    .block-container{padding:14px 10px;}
+    .symbol,.hit{width:10px;height:10px;font-size:10px;line-height:10px;}
+}
+</style>
+</head>
+<body>
+<h1>揭字游戏</h1>
+<div class="block-container" id="article"></div>
+<div class="control-wrap">
+  <input type="text" id="inputIdiom" placeholder="输入四字成语">
+  <button id="submitBtn" onclick="submitIdiom()">提交</button>
+  <button id="resetBtn" onclick="resetAll()">重置</button>
+</div>
+<div class="record-area">
+  <h3>提交记录 <span id="recordCount" style="font-size:12px;color:#888;">(0)</span></h3>
+  <div id="recordList"></div>
+</div>
+
+<script>
+const API_BASE = '';
+const authToken = localStorage.getItem('authToken') || '';
+
+const lines = [
+`将原料海水加热到一定温度后引入闪蒸室，由于该闪蒸室中的压力控制在低于热盐水温度所对应的饱和蒸汽压的条件下，故热盐水进入闪蒸室后即因为过热而急速的部分汽化，从而使热盐水自身的温度降低，所产生的蒸汽冷凝后即为所需的淡水。`,
+`多级闪蒸就是以此原理为基础，使热盐水依次流经若干个压力逐渐降低的闪蒸室，逐级蒸发降温，`,
+`同时盐水也逐级增浓，直到其温度接近 (但高于) 天然海水温度。在一定的压力下，`,
+`把经过预热的海水加热至某一温度，引入第一个闪蒸室，降压使海水闪急蒸发，`,
+`产生的蒸汽在热交换管外冷凝而成淡水，而留下的海水，温度降到相应的饱和温度。`,
+`依次将浓缩海水引入以后各闪蒸室逐级降压，使其闪急蒸发，再冷凝而得到淡水。闪蒸室的个数，`,
+`称为级数，最常见的装置有 20～30 级，有些装置可达 40 级以上。`
+];
+const fullText = lines.join('');
+let hitChars = new Set();
+let submitRecords = [];
+let syncing = false; // 防止自己保存后又被轮询覆盖
+
+// ============ 直接从后端读取进度 ============
+async function loadProgress() {
+    if (!authToken) return;
+    if (syncing) return;
+    try {
+        const res = await fetch(API_BASE + '/api/jiezi-progress', {
+            headers: { 'x-auth-token': authToken }
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const remote = data.data;
+            // 合并：取并集，防止误覆盖队友的进度
+            const remoteHits = new Set(remote.hitChars || []);
+            const mergedHits = new Set([...hitChars, ...remoteHits]);
+            
+            // 提交记录：取更长的（防止覆盖）
+            let mergedRecords = submitRecords;
+            if ((remote.submitRecords || []).length > submitRecords.length) {
+                mergedRecords = remote.submitRecords;
+            }
+            
+            hitChars = mergedHits;
+            submitRecords = mergedRecords;
+            updateRecordUI();
+            renderAll();
+        }
+    } catch (e) { /* 静默失败 */ }
+}
+
+// ============ 保存进度到后端 ============
+async function saveProgress() {
+    if (!authToken) return;
+    syncing = true;
+    try {
+        await fetch(API_BASE + '/api/jiezi-progress', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': authToken
+            },
+            body: JSON.stringify({
+                progress: {
+                    hitChars: Array.from(hitChars),
+                    submitRecords: submitRecords.slice(-100)
+                }
+            })
+        });
+    } catch (e) { /* 静默失败 */ }
+    finally {
+        setTimeout(() => { syncing = false; }, 500);
+    }
+}
+
+function submitIdiom(){
+    const val = document.getElementById('inputIdiom').value.trim();
+    const reg = /^[\u4e00-\u9fa5]{4}$/;
+    if(!reg.test(val)){ alert("请输入四字汉字成语"); return; }
+
+    let matchCount = 0;
+    const charStatus = [];
+    for(let c of val){
+        const exist = fullText.includes(c);
+        if(exist) matchCount++;
+        charStatus.push({char:c, exist:exist});
+    }
+    const hasAnyMatch = matchCount >= 1;
+
+    submitRecords.push({word: val, correct: hasAnyMatch, detail: charStatus});
+    for(let c of val){ if(fullText.includes(c)) hitChars.add(c); }
+
+    updateRecordUI();
+    renderAll();
+    saveProgress(); // 直接保存到后端
+    document.getElementById('inputIdiom').value = '';
+}
+
+function updateRecordUI(){
+    let html = '';
+    submitRecords.slice(-100).forEach((item, idx)=>{
+        const cls = item.correct ? 'correct' : 'wrong';
+        const tag = item.correct ? ' ✔' : ' ✘';
+        const detailStr = item.detail.map(d=> d.exist ? d.char : `<s>${d.char}</s>`).join('');
+        html += `<div class="record-item ${cls}">${idx+1}. ${item.word} ${detailStr} ${tag}</div>`;
+    });
+    document.getElementById('recordList').innerHTML = html;
+    document.getElementById('recordCount').textContent = `(${submitRecords.length})`;
+}
+
+function renderAll(){
+    let html = '';
+    for(let lineStr of lines){
+        html += `<div class="line">`;
+        for(let c of lineStr){
+            html += hitChars.has(c) ? `<span class="hit">■</span>` : `<span class="symbol">■</span>`;
+        }
+        html += `</div>`;
+    }
+    document.getElementById('article').innerHTML = html;
+}
+
+function resetAll(){
+    if(!confirm("重置会清空所有提交记录和已亮起的字，且影响队友，确定吗？")) return;
+    hitChars.clear();
+    submitRecords = [];
+    updateRecordUI();
+    renderAll();
+    saveProgress();
+}
+
+document.getElementById('inputIdiom').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ submitIdiom(); }
+});
+
+// 初始化
+renderAll();
+updateRecordUI();
+loadProgress(); // 首次加载时读取队友的进度
+setInterval(loadProgress, 3000); // 每3秒同步一次队友的进度
+</script>
+</body>
+</html>

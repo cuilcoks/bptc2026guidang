@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小组件</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
+body{background:#111;color:#fff;padding:30px 16px;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+#timeDisplay{font-size:clamp(32px,7vw,56px);font-family:Consolas,monospace;margin-bottom:30px;color:#0f8;text-align:center;letter-spacing:2px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:500px;margin:0 auto;width:100%}
+#btnStart{height:90px;font-size:22px;background:#28a745;border:none;border-radius:12px;color:#fff;font-weight:bold;cursor:pointer}
+#btnStop{height:90px;font-size:22px;background:#dc3545;border:none;border-radius:12px;color:#fff;font-weight:bold;cursor:pointer}
+#btnReset{grid-column:1/-1;height:60px;font-size:20px;background:#337ab7;border:none;border-radius:12px;color:#fff;font-weight:bold;cursor:pointer}
+button:active{opacity:0.8}
+button:disabled{background:#555!important;cursor:not-allowed;opacity:0.6}
+.hint{text-align:center;color:#666;font-size:13px;margin-top:24px;letter-spacing:1px}
+.result-mask{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:999;padding:20px}
+.result-mask.show{display:flex}
+.result-box{background:#1a1a1a;border:2px solid #0f8;border-radius:16px;padding:32px 24px;max-width:520px;text-align:center;box-shadow:0 0 60px rgba(0,255,136,0.3)}
+.result-box h2{color:#0f8;font-size:22px;margin-bottom:16px;letter-spacing:2px}
+.result-box p{color:#ccc;font-size:14px;margin-bottom:20px;line-height:1.8}
+.result-box button{background:#0f8;color:#111;border:none;padding:10px 28px;border-radius:8px;font-weight:bold;font-size:15px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="timeDisplay">0.0000000 s</div>
+<div class="btns">
+<button id="btnStart">开始</button>
+<button id="btnStop" disabled>停止</button>
+<button id="btnReset">重置</button>
+</div>
+<div class="hint">提示：0帧起手</div>
+
+<div class="result-mask" id="resultMask">
+  <div class="result-box">
+    <h2>⚡ 时间冻结！</h2>
+    <p>你在那一瞬间抓住了时间。<br>回到题目，看看有什么变化吧。</p>
+    <button onclick="document.getElementById('resultMask').classList.remove('show')">好的</button>
+  </div>
+</div>
+
+<script>
+const API_BASE = '';
+const authToken = localStorage.getItem('authToken') || '';
+
+const disp = document.getElementById('timeDisplay');
+const btnStart = document.getElementById('btnStart');
+const btnStop = document.getElementById('btnStop');
+const btnReset = document.getElementById('btnReset');
+
+let startTime = 0;
+let running = false;
+let animId = null;
+let triggered = false; // 防止重复触发
+
+function formatSec(sec){ return sec.toFixed(7) + ' s'; }
+
+function update(){
+    if(!running) return;
+    const now = performance.now();
+    const delta = (now - startTime) / 1000;
+    disp.textContent = formatSec(delta);
+    animId = requestAnimationFrame(update);
+}
+
+btnStart.onclick = ()=>{
+    if(running) return;
+    running = true;
+    startTime = performance.now();
+    btnStart.disabled = true;
+    btnStop.disabled = false;
+    update();
+}
+
+btnStop.onclick = ()=>{
+    if(!running) return;
+    running = false;
+    cancelAnimationFrame(animId);
+    const endTime = performance.now();
+    const delta = (endTime - startTime) / 1000;
+    disp.textContent = formatSec(delta);
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+
+    // 👈 核心触发：小于 0.1 秒
+    if (delta < 0.1 && !triggered) {
+        triggered = true;
+        onTriggered();
+    }
+}
+
+btnReset.onclick = ()=>{
+    running = false;
+    cancelAnimationFrame(animId);
+    startTime = 0;
+    disp.textContent = formatSec(0);
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+};
+
+// 👈 达成 0.1s 后调用
+async function onTriggered() {
+    // 1. 保存到后端
+    try {
+        await fetch(API_BASE + '/api/stopwatch-solved', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': authToken
+            }
+        });
+    } catch (e) {}
+
+    // 2. 通知父页面刷新状态
+    if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'stopwatchSolved' }, '*');
+    }
+
+    // 3. 显示提示
+    document.getElementById('resultMask').classList.add('show');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sign</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,sans-serif; }
+  body {
+    min-height:100vh;
+    background:#111827;
+    color:#fff;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:28px;
+    padding:20px;
+  }
+  .time-display { font-size:2.2rem; font-family:monospace; }
+  #signBtn {
+    padding:14px 40px;
+    font-size:1.3rem;
+    border:none;
+    border-radius:10px;
+    background:#2563eb;
+    color:white;
+    cursor:pointer;
+    transition:0.2s;
+  }
+  #signBtn:disabled { background:#4b5563; cursor:not-allowed; }
+  .cool-info { color:#9ca3af; }
+  .result { font-size:1.4rem; min-height:36px; color:#34d399; }
+  .sync-info { font-size:12px; color:#6b7280; }
+</style>
+</head>
+<body>
+    <div class="time-display" id="timeText"></div>
+    <button id="signBtn">签到</button>
+    <div class="cool-info" id="coolText"></div>
+    <div class="result" id="resultText"></div>
+    <div class="sync-info" id="syncText">正在同步…</div>
+
+<script>
+    // 按顺序的字符片段，与时间段一一对应
+    // 8-10点 -> seqList[0], 10-12点 -> seqList[1], 以此类推
+    const seqList = ["K","I M","Y","T A T G C G J Q L","B","Y Y W S P",""];
+
+    // ============ 队伍共享状态 ============
+    let state = {
+        seqIndex: 0,       // 保留字段（兼容旧数据），现在由时间段决定
+        lastSignTime: 0,   // 上次签到的时间戳
+        updatedAt: 0
+    };
+
+    const timeText = document.getElementById("timeText");
+    const signBtn = document.getElementById("signBtn");
+    const coolText = document.getElementById("coolText");
+    const resultText = document.getElementById("resultText");
+    const syncText = document.getElementById("syncText");
+
+    // ============ 与父页面通信 ============
+    function requestRemote() {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'getSigninProgress' }, '*');
+        }
+    }
+
+    function pushState() {
+        if (window.parent && window.parent !== window) {
+            state.updatedAt = Date.now();
+            window.parent.postMessage({ type: 'saveSigninProgress', data: state }, '*');
+        }
+    }
+
+    window.addEventListener('message', (e) => {
+        if (!e.data || e.data.type !== 'signinProgress') return;
+        const remote = e.data.data;
+        if (remote && typeof remote.lastSignTime === 'number') {
+            // 只有远程更新时才覆盖本地，防止刚点完签到被旧数据回滚
+            if ((remote.updatedAt || 0) > (state.updatedAt || 0)) {
+                state.lastSignTime = remote.lastSignTime || 0;
+                state.updatedAt = remote.updatedAt || Date.now();
+                refreshButton();
+                syncText.textContent = '✓ 已同步';
+                syncText.style.color = '#34d399';
+            } else {
+                syncText.textContent = '✓ 已同步（本地最新）';
+                syncText.style.color = '#34d399';
+            }
+        } else {
+            syncText.textContent = '✓ 使用本地进度';
+        }
+    });
+
+    // ============ 页面时间 ============
+    function updateTime() {
+        timeText.innerText = new Date().toLocaleString();
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // ============ 核心：根据时间获取对应的时间段索引 ============
+    function getPeriodInfo(timeStamp) {
+        if (!timeStamp) return { dateStr: "", periodIndex: -1 };
+        const d = new Date(timeStamp);
+        const hour = d.getHours();
+        let pIndex = -1;
+
+        // 8-10点(0), 10-12点(1), 12-14点(2), 14-16点(3), 16-18点(4), 18-20点(5), 20-22点(6)
+        if (hour >= 8 && hour < 10) pIndex = 0;
+        else if (hour >= 10 && hour < 12) pIndex = 1;
+        else if (hour >= 12 && hour < 14) pIndex = 2;
+        else if (hour >= 14 && hour < 16) pIndex = 3;
+        else if (hour >= 16 && hour < 18) pIndex = 4;
+        else if (hour >= 18 && hour < 20) pIndex = 5;
+        else if (hour >= 20 && hour < 22) pIndex = 6;
+
+        return { 
+            dateStr: d.toDateString(), 
+            periodIndex: pIndex 
+        };
+    }
+
+    // ============ 刷新按钮状态 ============
+    function refreshButton() {
+        const now = new Date();
+        const currentPeriodInfo = getPeriodInfo(now.getTime());
+        const currentPeriod = currentPeriodInfo.periodIndex;
+
+        // 1. 判断是否在可签到的时间段内 (8:00 - 22:00)
+        if (currentPeriod === -1) {
+            coolText.innerText = "当前不在签到时间段内 (08:00 - 22:00)";
+            signBtn.disabled = true;
+            return;
+        }
+
+        // 2. 判断今天在这个时间段是否已经签过到
+        const lastSignInfo = getPeriodInfo(state.lastSignTime);
+        const isSameDay = lastSignInfo.dateStr === currentPeriodInfo.dateStr;
+        const isSamePeriod = lastSignInfo.periodIndex === currentPeriod;
+
+        if (isSameDay && isSamePeriod) {
+            coolText.innerText = "本时间段已签到";
+            signBtn.disabled = true;
+        } else {
+            // 👇 修改处：去掉了“将获得”，只保留可签到提示
+            coolText.innerText = "✅ 本时间段可签到";
+            signBtn.disabled = false;
+        }
+    }
+    setInterval(refreshButton, 1000);
+
+    // ============ 签到 ============
+    signBtn.onclick = () => {
+        const nowTs = Date.now();
+        const currentPeriodInfo = getPeriodInfo(nowTs);
+        const currentPeriod = currentPeriodInfo.periodIndex;
+
+        // 安全校验：不在时间段内
+        if (currentPeriod === -1) {
+            alert("当前不在签到时间段内！");
+            return;
+        }
+
+        // 安全校验：本时间段是否已签到
+        const lastSignInfo = getPeriodInfo(state.lastSignTime);
+        if (lastSignInfo.dateStr === currentPeriodInfo.dateStr && lastSignInfo.periodIndex === currentPeriod) {
+            alert("本时间段已经签过到了，请等待下一个时间段！");
+            refreshButton();
+            return;
+        }
+
+        // 发放奖励
+        const reward = seqList[currentPeriod] || '（空）';
+        resultText.innerText = `签到奖励：${reward}`;
+        
+        // 更新状态并同步
+        state.lastSignTime = nowTs;
+        state.updatedAt = nowTs;
+        pushState();
+        
+        // 刷新按钮状态
+        refreshButton();
+    };
+
+    // ============ 初始化 ============
+    refreshButton();
+    requestRemote();
+    setInterval(requestRemote, 2000);
+</script>
+</body>
+</html>

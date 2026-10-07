@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>双人答题闯关</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,sans-serif;}
+body{max-width:900px;margin:2rem auto;padding:0 1rem;background:#f4f7fa;}
+.box{background:white;padding:24px;border-radius:12px;box-shadow:0 2px 10px #0002;margin-bottom:16px;}
+.hidden{display:none;}
+.question-block{margin:12px 0;padding:16px;border:1px solid #e2e8f0;border-radius:10px;}
+.answer-input{width:100%;padding:10px;margin-top:10px;border:1px solid #ccc;border-radius:8px;font-size:16px;}
+.btn-sm{padding:6px 12px;font-size:14px;margin-top:6px;border:none;border-radius:6px;background:#2563eb;color:white;cursor:pointer;}
+.btn-sm:disabled{background:#94a3b8;cursor:not-allowed;}
+.q-images img{max-width:100%;border-radius:8px;margin-top:10px;display:block;}
+#big-img{max-width:100%;border-radius:10px;margin-top:10px;}
+.info{color:#475569;font-size:14px;}
+.correct{color:#16a34a;font-weight:bold;}
+.wrong{color:#dc2626;font-weight:bold;}
+.loading{text-align:center;color:#888;padding:40px 0;}
+</style>
+</head>
+<body>
+
+<div id="loading" class="box">
+  <p class="loading">正在识别身份…</p>
+</div>
+
+<div id="main-app" class="hidden">
+  <div id="select-question" class="box">
+    <h3>选择你要做的小题</h3>
+    <p class="info" id="whoami"></p>
+    <div id="q-list"></div>
+  </div>
+
+  <div id="doing-question" class="box hidden">
+    <h3 id="doing-title">你的题目</h3>
+    <div id="q-content"></div>
+    <input type="text" id="answer-input" class="answer-input" placeholder="输入本题答案" onkeydown="if(event.key==='Enter')submitAnswer()" />
+    <div style="margin-top:10px;">
+      <button class="btn-sm" id="btn-submit" onclick="submitAnswer()">提交答案</button>
+      <button class="btn-sm" id="btn-refill" style="background:#eab308; display:none;" onclick="refillAttempts()">消耗 10000 柿币补充 10 次</button>
+      <button class="btn-sm" style="background:#64748b;" onclick="backToSelect()">返回选题</button>
+    </div>
+    <p id="msg" style="margin-top:10px; font-weight:bold;"></p>
+  </div>
+
+  <div class="box">
+    <h3>大题（随小题进度变化图片）</h3>
+    <p>当前完成小题数量：<span id="done-count">0</span> / 3</p>
+    <img id="big-img" src="" alt="大题图" style="display:none;">
+  </div>
+</div>
+
+<script>
+const API_BASE = '';
+const authToken = localStorage.getItem('authToken') || '';
+let player = null;
+let playerName = '';
+let currentQid = null;
+let splitProgress = { taken: {}, solved: {}, attempts: {} };
+
+const Q_INFO = {
+  '1': { title: '🏛️', images: ['/img/split/P1_1.png', '/img/split/P1_2.png'] },
+  '2': { title: '⏰', images: ['/img/split/P2_1.png'] },
+  '3': { title: '🚉', images: ['/img/yxzc/T3-1.png'] }
+};
+const BIG_FINAL_IMAGE = '/img/split/P_Final.png';
+
+// ========== 初始化：识别当前登录玩家身份 ==========
+async function initPlayer() {
+  if (!authToken) {
+    document.getElementById('loading').innerHTML = '<p class="wrong">未登录，请先登录比赛系统</p>';
+    return;
+  }
+  try {
+    const res = await fetch(API_BASE + '/api/auth/me', { headers: { 'x-auth-token': authToken } });
+    const data = await res.json();
+    if (data.success && data.user) {
+      player = data.user.username;
+      playerName = data.user.name || data.user.username;
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('main-app').classList.remove('hidden');
+      document.getElementById('whoami').textContent = `当前身份：${playerName}`;
+      await fetchSplitProgress();
+      setInterval(fetchSplitProgress, 3000);
+    } else {
+      document.getElementById('loading').innerHTML = '<p class="wrong">登录状态失效，请刷新外层页面</p>';
+    }
+  } catch (e) {
+    document.getElementById('loading').innerHTML = '<p class="wrong">无法连接服务器</p>';
+  }
+}
+
+async function fetchSplitProgress() {
+  try {
+    const res = await fetch(API_BASE + '/api/split-progress', { headers: { 'x-auth-token': authToken } });
+    const data = await res.json();
+    if (data.success) {
+      splitProgress = data.data;
+      renderAll();
+    }
+  } catch (e) {}
+}
+
+// ========== 渲染选题列表 ==========
+function renderQuestionList() {
+  const wrap = document.getElementById('q-list');
+  wrap.innerHTML = "";
+  const allQids = ['1','2','3'];
+
+  const myTaken = allQids.filter(qid => splitProgress.taken[qid] === player && !splitProgress.solved[qid]);
+  const available = allQids.filter(qid => !splitProgress.taken[qid] && !splitProgress.solved[qid]);
+  const solved = allQids.filter(qid => splitProgress.solved[qid]);
+
+  if (myTaken.length === 0 && available.length === 0) {
+    wrap.innerHTML = "<p class='correct'>🎉 所有小题均已领取或解出！请查看大图提取最终答案。</p>";
+    return;
+  }
+
+  if (myTaken.length > 0) {
+    const title = document.createElement('p');
+    title.innerHTML = "<b>你领取的题目（可继续作答）：</b>";
+    wrap.appendChild(title);
+    myTaken.forEach(qid => {
+      const div = document.createElement('div');
+      div.className = "question-block";
+      div.innerHTML = `<p>${Q_INFO[qid].title} 小题</p><button class="btn-sm" onclick="pickQuestion('${qid}')">继续答题</button>`;
+      wrap.appendChild(div);
+    });
+  }
+
+  if (available.length > 0) {
+    const title = document.createElement('p');
+    title.style.marginTop = myTaken.length > 0 ? '16px' : '0';
+    title.innerHTML = "<b>可领取的题目：</b>";
+    wrap.appendChild(title);
+    available.forEach(qid => {
+      const div = document.createElement('div');
+      div.className = "question-block";
+      div.innerHTML = `<p>${Q_INFO[qid].title} 小题</p><button class="btn-sm" onclick="pickQuestion('${qid}')">领取这道题</button>`;
+      wrap.appendChild(div);
+    });
+  }
+
+  if (solved.length > 0) {
+    const title = document.createElement('p');
+    title.style.marginTop = '16px';
+    title.innerHTML = "<b>已完成的题目：</b>";
+    wrap.appendChild(title);
+    solved.forEach(qid => {
+      const div = document.createElement('div');
+      div.className = "question-block";
+      div.innerHTML = `<p>${Q_INFO[qid].title} 小题 ✅ 已解出</p>`;
+      wrap.appendChild(div);
+    });
+  }
+}
+
+// ========== 领取 / 继续答题 ==========
+async function pickQuestion(qid) {
+  if (splitProgress.taken[qid] === player && !splitProgress.solved[qid]) {
+    currentQid = qid;
+    renderDoing(true); // 👈 主动切换时，才清空输入框
+    return;
+  }
+  const res = await fetch(API_BASE + '/api/split-claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+    body: JSON.stringify({ qid, player })
+  });
+  const data = await res.json();
+  if (data.success) {
+    splitProgress = data.data;
+    currentQid = qid;
+    renderDoing(true); // 👈 主动切换时，才清空输入框
+  } else {
+    alert(data.error);
+    fetchSplitProgress();
+  }
+}
+
+// ========== 渲染答题区域（核心修复：轮询时不覆盖输入框） ==========
+function renderDoing(isFresh = false) {
+  document.getElementById('select-question').classList.add('hidden');
+  document.getElementById('doing-question').classList.remove('hidden');
+
+  // 👇 先保存当前输入框和提示，等重绘完再恢复（除非是刚进入这一题）
+  let savedValue = '';
+  let savedMsgText = '';
+  let savedMsgClass = '';
+  if (!isFresh) {
+    const inputEl = document.getElementById('answer-input');
+    const msgEl = document.getElementById('msg');
+    if (inputEl) savedValue = inputEl.value;
+    if (msgEl) { savedMsgText = msgEl.textContent; savedMsgClass = msgEl.className; }
+  }
+
+  const info = Q_INFO[currentQid];
+  document.getElementById('doing-title').innerHTML = `你正在做：${info.title}`;
+
+  let html = `<div class="q-images">`;
+  info.images.forEach(imgSrc => {
+    html += `<img src="${imgSrc}" alt="${info.title} 题目图片">`;
+  });
+  html += `</div>`;
+  document.getElementById('q-content').innerHTML = html;
+
+  // 恢复输入框和提示内容
+  const inputEl = document.getElementById('answer-input');
+  const msgEl = document.getElementById('msg');
+  inputEl.value = savedValue;
+  msgEl.textContent = savedMsgText;
+  msgEl.className = savedMsgClass;
+
+  const attempts = splitProgress.attempts[currentQid] !== undefined ? splitProgress.attempts[currentQid] : 10;
+  if (attempts <= 0) {
+    document.getElementById('btn-submit').style.display = 'none';
+    document.getElementById('btn-refill').style.display = 'inline-block';
+    if (!savedMsgText) {
+      msgEl.textContent = '次数已用完！';
+      msgEl.className = 'wrong';
+    }
+  } else {
+    document.getElementById('btn-submit').style.display = 'inline-block';
+    document.getElementById('btn-refill').style.display = 'none';
+  }
+}
+
+// ========== 提交答案 ==========
+async function submitAnswer() {
+  const answer = document.getElementById('answer-input').value.trim();
+  if (!answer) return alert('请输入答案');
+
+  const res = await fetch(API_BASE + '/api/split-submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+    body: JSON.stringify({ qid: currentQid, answer })
+  });
+  const data = await res.json();
+
+  if (data.success) {
+    if (data.correct) {
+      document.getElementById('msg').textContent = '✅ 回答正确！';
+      document.getElementById('msg').className = 'correct';
+      setTimeout(() => { backToSelect(); }, 1000);
+    } else {
+      document.getElementById('msg').textContent = `❌ 回答错误，剩余次数：${data.attemptsLeft}`;
+      document.getElementById('msg').className = 'wrong';
+      if (data.attemptsLeft <= 0) {
+        document.getElementById('btn-submit').style.display = 'none';
+        document.getElementById('btn-refill').style.display = 'inline-block';
+      }
+    }
+    splitProgress = data.data;
+    updateBigImage();
+  } else {
+    alert(data.error);
+  }
+}
+
+// ========== 补充次数 ==========
+async function refillAttempts() {
+  if (!confirm('确定消耗 10000 柿币，补充 10 次答题机会吗？')) return;
+  const res = await fetch(API_BASE + '/api/split-refill', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+    body: JSON.stringify({ qid: currentQid })
+  });
+  const data = await res.json();
+  if (data.success) {
+    splitProgress.attempts[currentQid] = data.attemptsLeft;
+    renderDoing();
+    document.getElementById('msg').textContent = '✅ 补充成功！';
+    document.getElementById('msg').className = 'correct';
+  } else {
+    alert(data.error);
+  }
+}
+
+// ========== 返回选题 ==========
+function backToSelect() {
+  currentQid = null;
+  document.getElementById('doing-question').classList.add('hidden');
+  document.getElementById('select-question').classList.remove('hidden');
+  renderAll();
+}
+
+// ========== 大图更新 ==========
+function updateBigImage() {
+  const solvedCount = Object.keys(splitProgress.solved || {}).filter(k => splitProgress.solved[k]).length;
+  document.getElementById('done-count').textContent = solvedCount;
+  const img = document.getElementById('big-img');
+  if (solvedCount >= 3) {
+    if (img.src !== BIG_FINAL_IMAGE) img.src = BIG_FINAL_IMAGE;
+    img.style.display = 'block';
+  } else {
+    img.src = '';
+    img.style.display = 'none';
+  }
+}
+
+// ========== 统一渲染 ==========
+function renderAll() {
+  renderQuestionList();
+  updateBigImage();
+  if (currentQid) {
+    if (splitProgress.solved[currentQid]) {
+      currentQid = null;
+      document.getElementById('doing-question').classList.add('hidden');
+      document.getElementById('select-question').classList.remove('hidden');
+    } else {
+      renderDoing(false); // 👈 同步时不清空输入框
+    }
+  }
+}
+
+// 启动
+initPlayer();
+</script>
+</body>
+</html>
