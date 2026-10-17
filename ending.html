@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BPTC·2026 成功！</title>
+<style>
+  :root{
+    --bg:#0b0c14;--bg2:#121422;--gold:#d9a441;--gold-soft:#e8c060;
+    --ink:#2a2b4a;--dim:#8b8ba8;--seal:#c84040;
+    --serif:'Noto Serif SC','Songti SC','Georgia',serif;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -20%, rgba(217,164,65,.18), transparent 60%),
+      radial-gradient(900px 500px at 90% 110%, rgba(200,64,64,.10), transparent 55%),
+      var(--bg);
+    color:#e8e4d8;font-family:var(--sans);min-height:100vh;padding:40px 20px;
+    display:flex;align-items:flex-start;justify-content:center;
+  }
+  .container{max-width:760px;width:100%}
+
+  /* 音乐启动遮罩 */
+  .music-gate{
+    position:fixed;inset:0;z-index:9999;
+    background:radial-gradient(800px 500px at 50% 40%, rgba(217,164,65,.15), transparent 70%),
+      var(--bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;transition:opacity .8s ease;
+  }
+  .music-gate.hide{opacity:0;pointer-events:none}
+  .music-gate .gate-icon{
+    width:110px;height:110px;border-radius:50%;
+    border:3px solid var(--gold);color:var(--gold);
+    display:flex;align-items:center;justify-content:center;
+    font-size:44px;margin-bottom:32px;
+    background:rgba(217,164,65,.06);
+    box-shadow:0 0 60px rgba(217,164,65,.35);
+    animation:gatePulse 2.4s infinite ease-in-out;
+  }
+  @keyframes gatePulse{
+    0%,100%{transform:scale(1);box-shadow:0 0 60px rgba(217,164,65,.35)}
+    50%{transform:scale(1.06);box-shadow:0 0 90px rgba(217,164,65,.6)}
+  }
+  .music-gate h2{
+    font-family:var(--serif);font-weight:900;font-size:26px;
+    color:var(--gold-soft);letter-spacing:8px;margin-bottom:14px;
+  }
+  .music-gate p{
+    color:var(--dim);font-size:13px;letter-spacing:3px;
+    animation:blink 1.6s infinite;
+  }
+  @keyframes blink{0%,100%{opacity:.4}50%{opacity:1}}
+
+  /* 音乐控制区 */
+  .music-controls{
+    position:fixed;right:20px;bottom:20px;z-index:9000;
+    display:flex;align-items:center;gap:10px;
+    background:rgba(11,12,20,.8);
+    padding:8px 14px;border-radius:30px;
+    border:1px solid rgba(217,164,65,.3);
+    backdrop-filter:blur(8px);
+    transition:.2s;
+  }
+  .music-controls:hover{border-color:rgba(217,164,65,.6)}
+  .music-controls input[type=range]{
+    -webkit-appearance:none;
+    width:80px;height:4px;
+    background:rgba(217,164,65,.3);
+    border-radius:2px;outline:none;
+  }
+  .music-controls input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:12px;height:12px;border-radius:50%;
+    background:var(--gold-soft);cursor:pointer;
+    box-shadow:0 0 8px rgba(217,164,65,.6);
+  }
+  .music-toggle{
+    width:36px;height:36px;border-radius:50%;
+    background:rgba(217,164,65,.15);border:1px solid rgba(217,164,65,.5);
+    color:var(--gold-soft);font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:.2s;user-select:none;
+  }
+  .music-toggle:hover{background:rgba(217,164,65,.3);transform:scale(1.08)}
+  .music-toggle.muted{color:#666;border-color:#333;background:rgba(255,255,255,.03)}
+
+  .loading{text-align:center;color:var(--dim);padding:100px 0;font-size:14px;letter-spacing:3px}
+
+  .blocked{text-align:center;padding:100px 30px;background:var(--bg2);
+    border:1px solid rgba(217,164,65,.2);border-radius:14px}
+  .blocked h2{font-family:var(--serif);color:var(--gold);font-size:24px;margin-bottom:12px;letter-spacing:2px}
+  .blocked p{color:var(--dim);font-size:14px;margin-bottom:26px}
+  .blocked a{display:inline-block;padding:10px 26px;background:var(--gold);color:var(--ink);
+    border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:1px}
+  .blocked a:hover{filter:brightness(1.1)}
+
+  .stage{display:none}
+
+  .seal{width:120px;height:120px;margin:0 auto 28px;border-radius:50%;
+    border:5px solid var(--seal);color:var(--seal);font-family:var(--serif);
+    font-weight:900;font-size:38px;display:flex;align-items:center;justify-content:center;
+    transform:rotate(-10deg);background:rgba(200,64,64,.06);
+    box-shadow:0 0 80px rgba(200,64,64,.35), inset 0 0 30px rgba(200,64,64,.15);
+    animation:sealIn 1s ease-out both;
+  }
+  @keyframes sealIn{
+    0%{transform:rotate(-30deg) scale(2.5);opacity:0;filter:blur(6px)}
+    60%{transform:rotate(-8deg) scale(1);opacity:1;filter:blur(0)}
+    80%{transform:rotate(-12deg) scale(.96)}
+    100%{transform:rotate(-10deg) scale(1);opacity:1}
+  }
+
+  .title{
+    text-align:center;font-family:var(--serif);font-weight:900;
+    font-size:clamp(22px,4.2vw,34px);letter-spacing:4px;line-height:1.35;
+    margin:0 auto 12px;padding:0 10px;max-width:100%;
+    color:#f0e9d8;text-shadow:0 0 30px rgba(217,164,65,.35);
+    word-break:keep-all;
+    animation:fadeUp .8s ease-out .6s both;
+  }
+  .subtitle{text-align:center;font-size:13px;color:var(--gold-soft);
+    letter-spacing:6px;margin-bottom:44px;animation:fadeUp .8s ease-out .8s both}
+
+  .scroll{background:linear-gradient(180deg,#f6f1e3 0%,#ece4cf 100%);
+    color:#3a3226;border-radius:6px;padding:44px 40px;position:relative;
+    box-shadow:0 20px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(217,164,65,.3);
+    font-family:var(--serif);animation:fadeUp 1s ease-out 1s both}
+  .scroll::before,.scroll::after{content:'';position:absolute;left:-8px;right:-8px;height:12px;
+    background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold-soft) 50%,var(--gold) 70%,transparent);
+    border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .scroll::before{top:-6px}
+  .scroll::after{bottom:-6px}
+
+  .story{font-size:16.5px;line-height:2.1;letter-spacing:.6px;color:#3a3226}
+  .story p{margin-bottom:18px;text-indent:2em;animation:fadeUp .8s ease-out both}
+  .story p:nth-child(1){animation-delay:1.3s}
+  .story p:nth-child(2){animation-delay:1.6s}
+  .story p:nth-child(3){animation-delay:1.9s}
+  .story .quote{text-indent:0;text-align:center;font-weight:700;color:#8a6a1a;
+    letter-spacing:3px;font-size:17px;margin:26px 0;padding:16px 10px;
+    border-top:1px dashed #c8b88a;border-bottom:1px dashed #c8b88a}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+  .stats{
+    display:flex;
+    justify-content:center;
+    gap:48px;
+    flex-wrap:wrap;
+    margin-top:46px;
+    padding:26px 0 6px;
+    border-top:1px solid rgba(217,164,65,.2);
+    animation:fadeUp .8s ease-out 2.4s both;
+  }
+  .stats .item{text-align:center}
+  .stats .num{
+    font-family:var(--serif);
+    font-weight:900;
+    font-size:26px;
+    color:var(--gold);
+    letter-spacing:1px;
+    line-height:1.2;
+  }
+  .stats .lab{
+    font-size:12px;
+    color:var(--dim);
+    letter-spacing:4px;
+    margin-top:8px;
+  }
+
+  .chapter-end{
+    margin:64px 0 56px;
+    padding:40px 0 36px;
+    border-top:1px solid rgba(217,164,65,.45);
+    border-bottom:1px solid rgba(217,164,65,.45);
+    position:relative;
+    text-align:center;
+    font-family:var(--serif);
+    animation:fadeUp .8s ease-out 3.2s both;
+  }
+  .chapter-end .chapter-tag{
+    position:absolute;
+    top:-10px;
+    left:50%;
+    transform:translateX(-50%);
+    background:var(--bg);
+    padding:0 14px;
+    font-size:12px;
+    letter-spacing:4px;
+    color:var(--gold);
+  }
+  .chapter-end .chapter-main{
+    font-size:15px;
+    line-height:1.9;
+    color:#d8d4c8;
+    letter-spacing:2px;
+    margin-bottom:22px;
+    padding:0 12px;
+  }
+  .chapter-end .chapter-zi{
+    font-size:44px;
+    font-weight:900;
+    letter-spacing:16px;
+    color:var(--gold-soft);
+    text-shadow:0 0 40px rgba(217,164,65,.55);
+    line-height:1.1;
+  }
+
+  .credits{
+    margin-top:24px;
+    animation:fadeUp 1s ease-out 3.6s both;
+  }
+  .credits-head{
+    text-align:center;
+    font-family:var(--serif);
+    font-weight:900;
+    font-size:20px;
+    letter-spacing:14px;
+    color:var(--gold-soft);
+    margin-bottom:46px;
+    text-shadow:0 0 30px rgba(217,164,65,.3);
+  }
+  .credits-group{
+    margin-bottom:38px;
+  }
+  .credits-group .g-title{
+    text-align:center;
+    font-family:var(--serif);
+    font-weight:900;
+    font-size:15px;
+    letter-spacing:6px;
+    color:var(--gold);
+    margin-bottom:16px;
+    position:relative;
+  }
+  .credits-group .g-title::before,
+  .credits-group .g-title::after{
+    content:'';
+    display:inline-block;
+    width:32px;
+    height:1px;
+    background:rgba(217,164,65,.5);
+    vertical-align:middle;
+    margin:0 14px;
+  }
+  .credits-group .g-names{
+    text-align:center;
+    font-family:var(--serif);
+    font-size:15px;
+    line-height:2.2;
+    color:#d8d4c8;
+    letter-spacing:2px;
+  }
+  .credits-group .g-names .name{
+    display:inline-block;
+    margin:2px 12px;
+    color:#f0e9d8;
+  }
+
+  .credits-contact{
+    margin-top:60px;
+    padding:24px 20px;
+    text-align:center;
+    background:rgba(217,164,65,.06);
+    border:1px solid rgba(217,164,65,.3);
+    border-radius:12px;
+  }
+  .credits-contact .c-label{
+    font-family:var(--serif);
+    font-weight:900;
+    font-size:13px;
+    letter-spacing:8px;
+    color:var(--gold-soft);
+    margin-bottom:12px;
+  }
+  .credits-contact .c-value{
+    font-family:Georgia,serif;
+    font-weight:900;
+    font-size:28px;
+    letter-spacing:6px;
+    color:var(--gold);
+    text-shadow:0 0 30px rgba(217,164,65,.4);
+    user-select:all;
+    cursor:text;
+  }
+
+  .credits-final{
+    text-align:center;
+    margin-top:70px;
+    padding-top:26px;
+    border-top:1px solid rgba(217,164,65,.2);
+    font-family:var(--serif);
+    font-size:13px;
+    color:var(--dim);
+    letter-spacing:4px;
+    line-height:2.2;
+  }
+  .credits-final .name{
+    color:var(--gold-soft);
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:4px;
+  }
+
+  @media (max-width:640px){
+    body{padding:24px 14px}
+    .scroll{padding:30px 22px}
+    .story{font-size:15px;line-height:2}
+    .seal{width:96px;height:96px;font-size:30px;border-width:4px}
+    .music-gate h2{font-size:20px;letter-spacing:5px}
+    .music-gate .gate-icon{width:88px;height:88px;font-size:34px}
+    .title{font-size:20px;letter-spacing:2px}
+    .stats{gap:30px;margin-top:34px}
+    .stats .num{font-size:22px}
+    .chapter-end .chapter-main{font-size:14px;letter-spacing:1px}
+    .chapter-end .chapter-zi{font-size:34px;letter-spacing:10px}
+    .credits-head{font-size:16px;letter-spacing:8px;margin-bottom:36px}
+    .credits-group .g-title{font-size:14px;letter-spacing:4px}
+    .credits-group .g-names{font-size:14px;letter-spacing:1px}
+    .credits-group .g-names .name{margin:2px 8px}
+    .credits-contact .c-value{font-size:22px;letter-spacing:4px}
+    .music-controls{right:10px;bottom:10px;padding:6px 10px}
+    .music-controls input[type=range]{width:60px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 音乐启动遮罩 -->
+<div class="music-gate" id="musicGate">
+  <div class="gate-icon">♪</div>
+  <h2>点击进入最终章</h2>
+  <p>建议开启声音 · 佩戴耳机</p>
+</div>
+
+<!-- 音乐控制区 -->
+<div class="music-controls">
+  <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.2" title="音量调节">
+  <div class="music-toggle muted" id="musicToggle" title="音乐开关">🔇</div>
+</div>
+
+<!-- 背景音乐（路径改为了相对路径） -->
+<audio id="bgm" loop preload="auto">
+  <source src="audio/end/baozangjiushini.mp3" type="audio/mpeg">
+  您的浏览器不支持音频播放。
+</audio>
+
+<div class="container">
+
+  <div id="loading" class="loading">正在核对队伍记录…</div>
+
+  <div id="blocked" class="blocked" style="display:none;">
+    <h2>尚未完赛</h2>
+    <p>这条路的尽头，还差最后一步。<br>请先解开最终谜题，再回来。</p>
+    <a href="index.html">← 返回比赛主页</a>
+  </div>
+
+  <div id="stage" class="stage">
+
+    <div class="seal">完胜</div>
+
+    <div class="title">忙忙碌碌寻宝藏之景晨版本第三个宝藏公线</div>
+    <div class="subtitle">B P T C · 2 0 2 6</div>
+
+    <!-- ============ 剧情 ============ -->
+    <div class="scroll">
+      <div class="story">
+        <p>你找到了宝藏兑换券，它从头到尾都在你的身上。</p>
+        <p>这一切都始于某个"忙忙碌碌的时代"里。</p>
+        <p>一切的开端都来自于</p>
+        <p>好想录忙忙碌碌好想寻宝藏[锦鲤附体][苦涩]</p>
+        <p>想得很🤣 </p>
+        <p>这句话，开启了时空的最终逃脱</p>
+        <p>esc+ape连起来就是escape逃脱</p>
+        <p>最开始，原来想像原节目那样时空逃脱的</p>
+        <p>但是那样，就不好玩了</p>
+        <p>你是完成本次ph的玩家，很棒</p>
+        <p>谢谢你，坚持到了最后。</p>
+      </div>
+    </div>
+
+    <!-- ============ 统计区 ============ -->
+    <div class="stats" id="stats"></div>
+
+    <!-- ============ 剧情与致谢之间的分割线 ============ -->
+    <div class="chapter-end">
+      <span class="chapter-tag">终</span>
+      <p class="chapter-main">BPTC · 忙忙碌碌寻宝藏之景晨版本第三个宝藏公线</p>
+      <p class="chapter-zi">完</p>
+    </div>
+
+    <!-- ============ 致谢名单 ============ -->
+    <div class="credits">
+
+      <div class="credits-head">致 谢 名 单</div>
+
+      <div class="credits-group">
+        <div class="g-title">总 策 划</div>
+        <div class="g-names"><span class="name">阮汐汐汐汐（景晨）</span></div>
+      </div>
+
+      <div class="credits-group">
+        <div class="g-title">主 结 构 设 计</div>
+        <div class="g-names"><span class="name">阮汐汐汐汐（景晨）</span></div>
+      </div>
+
+      <div class="credits-group">
+        <div class="g-title">题 目 设 计</div>
+        <div class="g-names">
+          <span class="name">阮汐汐汐汐（景晨）</span>
+          <span class="name">面饼cake</span>
+          <span class="name">各位主播的朋友2</span>
+        </div>
+      </div>
+
+      <div class="credits-group">
+        <div class="g-title">网 站 U I / U X</div>
+        <div class="g-names"><span class="name">deepseek</span></div>
+      </div>
+
+      <div class="credits-group">
+        <div class="g-title">剧 情 文 案</div>
+        <div class="g-names"><span class="name">阮汐汐汐汐（景晨）</span></div>
+      </div>
+
+      <div class="credits-group">
+        <div class="g-title">题 目 测 试</div>
+        <div class="g-names">
+          <span class="name">铃</span>
+        </div>
+      </div>
+
+      <!-- ============ 外赛群 ============ -->
+      <div class="credits-contact">
+        <div class="c-label">完 赛 群</div>
+        <div class="c-value">830021258</div>
+      </div>
+
+      <div class="credits-final">
+        <div class="name">BPTC 组 委 会</div>
+        <div>2 0 2 6</div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+/* ============ 音乐控制 ============ */
+const bgm = document.getElementById('bgm');
+const gate = document.getElementById('musicGate');
+const toggle = document.getElementById('musicToggle');
+const volumeSlider = document.getElementById('volumeSlider');
+let musicPlaying = false;
+
+bgm.volume = 0.2;
+volumeSlider.value = 0.2;
+
+function setMusicState(playing){
+  musicPlaying = playing;
+  if(playing){
+    toggle.textContent = '🔊';
+    toggle.classList.remove('muted');
+    toggle.title = '暂停音乐';
+  }else{
+    toggle.textContent = '🔇';
+    toggle.classList.add('muted');
+    toggle.title = '播放音乐';
+  }
+}
+
+async function tryAutoPlay(){
+  try{
+    await bgm.play();
+    setMusicState(true);
+    gate.classList.add('hide');
+    setTimeout(() => { gate.style.display = 'none'; }, 800);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+gate.addEventListener('click', async () => {
+  try{
+    await bgm.play();
+    setMusicState(true);
+  }catch(e){}
+  gate.classList.add('hide');
+  setTimeout(() => { gate.style.display = 'none'; }, 800);
+});
+
+toggle.addEventListener('click', () => {
+  if(musicPlaying){
+    bgm.pause();
+    setMusicState(false);
+  }else{
+    bgm.play().then(() => setMusicState(true)).catch(() => {});
+  }
+});
+
+volumeSlider.addEventListener('input', (e) => {
+  bgm.volume = e.target.value;
+});
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    tryAutoPlay().then(ok => {
+      if(!ok){
+        gate.style.display = 'flex';
+      }
+    });
+  }, 150);
+});
+
+/* ============ 校验完赛状态（改为本地存储读取） ============ */
+function verify(){
+  const isFinished = localStorage.getItem('btpc_finished') === 'true';
+  
+  // 如果没有写入完成的 flag，但最终题已经做过，也允许进
+  const subs = JSON.parse(localStorage.getItem('btpc_sub_v3') || '{}');
+  const fmSolved = (subs['p_1790604104878'] || []).some(r => r.r === 'correct');
+  
+  if(isFinished || fmSolved){
+    showStage();
+  } else {
+    showBlocked();
+  }
+}
+
+function showBlocked(){
+  document.getElementById('loading').style.display='none';
+  document.getElementById('blocked').style.display='block';
+  bgm.pause();
+  gate.style.display = 'none';
+  document.querySelector('.music-controls').style.display = 'none';
+}
+
+function showStage(){
+  document.getElementById('loading').style.display='none';
+  document.getElementById('stage').style.display='block';
+
+  // 本地统计做对的题目数量
+  const subs = JSON.parse(localStorage.getItem('btpc_sub_v3') || '{}');
+  let solvedCount = 0;
+  for (const key in subs) {
+    if (subs[key].some(r => r.r === 'correct')) solvedCount++;
+  }
+  
+  // 获取玩家填写的身份
+  const prof = JSON.parse(localStorage.getItem('btpc_prf_v3') || '{}');
+  const playerName = prof.player || '勇敢的挑战者';
+
+  const stats = document.getElementById('stats');
+  stats.innerHTML = `
+    <div class="item"><div class="num">${solvedCount}</div><div class="lab">解 出 谜 题</div></div>
+    <div class="item"><div class="num">${playerName}</div><div class="lab">完 赛 选 手</div></div>
+  `;
+}
+
+verify();
+</script>
+</body>
+</html>
