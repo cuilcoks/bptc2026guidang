@@ -147,22 +147,6 @@ footer{text-align:center;padding:30px 20px;color:#5c6478;font-size:12px;border-t
     <div class="about">
       <h3>关于本站</h3>
       <p>本页面为 <b>BTPC 忙忙碌碌寻宝藏系列 · 景晨版本第三个宝藏公线赛</b> 的静态归档版本。</p>
-      <h3>已关闭</h3>
-      <ul>
-        <li>注册、登录、会话管理</li>
-        <li>柿币系统、兑换码、管理员调整</li>
-        <li>站内信、提问、排行榜、赛事计时</li>
-        <li>全部后端接口与数据库读写</li>
-      </ul>
-      <h3>保留</h3>
-      <ul>
-        <li>全部 18 道题目与提示</li>
-        <li>全部赛事公告</li>
-        <li>作答与提交记录（纯前端判题，仅存本地）</li>
-        <li>做题进度条</li>
-      </ul>
-      <h3>数据存储</h3>
-      <p>身份、提示解锁状态、提交记录均保存在浏览器本地 <code>localStorage</code>，不上传、不共享。</p>
       <h3>分区</h3>
       <ul>
         <li>s1 · 在那忙忙碌碌的时代（7 题）</li>
@@ -206,7 +190,7 @@ const ANS = {
   p_1789883252473:['日复一日'],p_1789883295025:['上善若水'],p_1789883266217:['金戈铁马'],
   p_1789883308641:['world'],p_1790604473893:['may this journey lead us starward'],
   p_1789657766936:['sanzimi_auto_pass'],p_1789801092927:['negroni'],
-  p_1790218681753:['穆卓儿','穆卓尔'],p_1790604104878:['*']
+  p_1790218681753:['穆卓儿','穆卓尔'],p_1790604104878:['*'] // 最终题判题单独处理
 };
 const MS = {
   p_1789735719724:['rain','drop','stream','fills','cold','clear','blue','wet','pool'],
@@ -440,7 +424,22 @@ function fmtS(t){const d=new Date(t),p=n=>String(n).padStart(2,'0');return `${p(
 function load(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v;}catch(e){return d;}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function norm(s){return String(s==null?'':s).trim().toLowerCase().replace(/[\s\u3000]+/g,' ').replace(/[，,]/g,'，');}
-function check(id,v){const n=norm(v);if(!n)return 'empty';const a=ANS[id]||[];if(a.indexOf('*')!==-1)return 'correct';for(const x of a)if(norm(x)===n)return 'correct';for(const x of (MS[id]||[]))if(norm(x)===n)return 'milestone';return 'wrong';}
+
+function check(id,v){
+  if(id==='p_1790604104878'){
+    const prof = load(PRF_K, {});
+    const playerName = prof.player || '';
+    if(!playerName) return 'wrong';
+    if(norm(v) === norm(playerName)) return 'correct';
+    return 'wrong';
+  }
+  const n=norm(v);
+  if(!n)return 'empty';
+  const a=ANS[id]||[];
+  for(const x of a)if(norm(x)===n)return 'correct';
+  for(const x of (MS[id]||[]))if(norm(x)===n)return 'milestone';
+  return 'wrong';
+}
 function solved(subs,id){return (subs[id]||[]).some(r=>r.r==='correct');}
 
 /* ===== 资源占位 ===== */
@@ -494,6 +493,17 @@ function renderList(){
           <div class="body">${p.c}</div>
           <div class="h-title">提示</div>
           <div class="hbox"></div>
+          
+          <!-- 零帧起手计时器 -->
+          <div class="stopwatch-game" style="display:none;" id="sw-game">
+            <div style="margin-top:15px;padding:15px;border:1px dashed #e8622f;border-radius:8px;background:#1a1f2c;">
+              <h4 style="margin:0 0 10px;color:#e8622f;font-size:14px;">反应力测试：零帧起手</h4>
+              <button class="ab sw-btn" style="width:100%;padding:10px;font-size:16px;">点击开始计时</button>
+              <div class="sw-timer" style="font-size:24px;font-weight:bold;margin-top:10px;text-align:center;color:#ffb703;font-family:monospace;">0.000 s</div>
+              <div class="sw-msg" style="text-align:center;margin-top:10px;font-size:13px;line-height:1.6;"></div>
+            </div>
+          </div>
+          
           <div class="ans">
             <h4>作答</h4>
             <div class="ans-row"><input type="text" class="ai" placeholder="输入答案后回车或点击提交" ${done?'disabled':''}><button class="ab" ${done?'disabled':''}>${done?'已完成':'提交'}</button></div>
@@ -501,7 +511,45 @@ function renderList(){
             <div class="recs"></div>
           </div>
         </div>`;
+        
       card.querySelector('.puz-h').addEventListener('click',()=>card.classList.toggle('open'));
+      
+      // 绑定计时器（如果这是 p_1789883237148）
+      if (p.id === 'p_1789883237148') {
+        const swWrap = card.querySelector('#sw-game');
+        swWrap.style.display = 'block';
+        let swState = 0; let swStart = 0; let swRAF = null;
+        const swBtn = swWrap.querySelector('.sw-btn');
+        const swTimer = swWrap.querySelector('.sw-timer');
+        const swMsg = swWrap.querySelector('.sw-msg');
+        
+        swBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if(swState === 0){
+            swState = 1; swStart = performance.now();
+            swBtn.textContent = '点击结束'; swBtn.style.background = '#dc2626';
+            swMsg.textContent = '';
+            const loop = () => {
+              if(swState !== 1) return;
+              const diff = performance.now() - swStart;
+              swTimer.textContent = (diff/1000).toFixed(3) + ' s';
+              swRAF = requestAnimationFrame(loop);
+            };
+            swRAF = requestAnimationFrame(loop);
+          } else {
+            swState = 0; cancelAnimationFrame(swRAF);
+            const diff = performance.now() - swStart;
+            swTimer.textContent = (diff/1000).toFixed(3) + ' s';
+            swBtn.textContent = '重新开始'; swBtn.style.background = '#e8622f';
+            if(diff <= 100){
+              swMsg.innerHTML = '<span style="color:#34c759;font-weight:bold;">🎉 成功！你做到了 0帧起手！</span><br>题目文本：你找到了，在名为“忙忙碌碌”的时代里。<br><br><a href="https://www.kdocs.cn/l/co3NP0FbzcHy" target="_blank" style="color:#7fd1ff;text-decoration:underline;">点击获取题目文档（示例链接）</a>';
+            } else {
+              swMsg.innerHTML = '<span style="color:#ff6b6b;font-weight:bold;">❌ 失败，时间超过 0.1 秒，请重试。</span>';
+            }
+          }
+        });
+      }
+
       const hbox=card.querySelector('.hbox');
       const us=unl[p.id]||{};
       if(!(p.h||[]).length){hbox.innerHTML='<div class="nohint">本题暂无归档提示。</div>';}
@@ -516,7 +564,7 @@ function renderList(){
         });
         hbox.appendChild(d);
       });}
-      const input=card.querySelector('.ai'),btn=card.querySelector('.ab'),msg=card.querySelector('.msg'),rc=card.querySelector('.recs');
+      const input=card.querySelector('.ai'),btn=card.querySelector('.ans .ab'),msg=card.querySelector('.msg'),rc=card.querySelector('.recs');
       function renderRec(){
         const all=load(SUB_K,{});const arr=all[p.id]||[];
         if(!arr.length){rc.innerHTML='';return;}
@@ -542,12 +590,20 @@ function renderList(){
         const r=check(p.id,v);
         const all=load(SUB_K,{});if(!all[p.id])all[p.id]=[];
         all[p.id].push({a:v,r:r,t:Date.now()});save(SUB_K,all);
+        
         if(r==='correct'){
-          msg.textContent=p.t==='final'?'✓ 恭喜完赛！':'✓ 回答正确！';msg.className='msg ok';
+          msg.className='msg ok';
           card.classList.add('done');
           const te=card.querySelector('.puz-title');
           if(te&&!te.querySelector('.tag.ok'))te.insertAdjacentHTML('beforeend',' <span class="tag ok">✓ 已完成</span>');
           input.disabled=true;btn.disabled=true;btn.textContent='已完成';renderProg();
+          
+          if(p.id === 'p_1790604104878'){
+            save('btpc_finished', true);
+            msg.innerHTML = '✓ 恭喜完赛！<br><br><button class="ab" style="background:#d9a441;color:#2a2b4a;font-weight:bold;margin-top:10px;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;" onclick="location.href=\'ending.html\'">前往终章</button>';
+          } else {
+            msg.textContent = '✓ 回答正确！';
+          }
         }else if(r==='milestone'){msg.textContent='◐ 这是里程碑答案，方向正确，但还不是最终答案。';msg.className='msg tip';}
         else{msg.textContent='✗ 答案不正确，再想想。';msg.className='msg bad';}
         input.value='';renderRec();input.focus();
