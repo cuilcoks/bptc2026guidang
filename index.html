@@ -542,7 +542,7 @@ function renderList(){
             swTimer.textContent = (diff/1000).toFixed(3) + ' s';
             swBtn.textContent = '重新开始'; swBtn.style.background = '#e8622f';
             if(diff <= 100){
-              swMsg.innerHTML = '<span style="color:#34c759;font-weight:bold;">🎉 成功！你做到了 0帧起手！</span><br>题目文本：你找到了，在名为“忙忙碌碌”的时代里。<br><br><a href="https://news.qq.com/rain/a/20260830A02OYE00?refer=cp_1009&scene=qqsearch" target="_blank" style="color:#7fd1ff;text-decoration:underline;">这里有一些隐藏的东西</a>';
+              swMsg.innerHTML = '<span style="color:#34c759;font-weight:bold;">🎉 成功！你解锁了隐藏内容</span><br><a href="https://news.qq.com/rain/a/20260830A02OYE00?refer=cp_1009&scene=qqsearch" target="_blank" style="color:#7fd1ff;text-decoration:underline;">这里有一些隐藏的东西</a>';
             } else {
               swMsg.innerHTML = '<span style="color:#ff6b6b;font-weight:bold;">❌ 失败，时间超过 0.1 秒，请重试。</span>';
             }
